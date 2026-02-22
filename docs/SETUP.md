@@ -60,6 +60,15 @@ WEBDAV_PASSWORD=your_password
 
 (Ensure `.dev.vars` is in `.gitignore` — it is by default.)
 
+### Cloudflare Image Resizing (faster delivery)
+
+Images from **public albums** are served via Cloudflare's edge (transform, cache, optimize). Enable Image Resizing on your zone:
+
+1. [Cloudflare Dashboard → Images → Transformations](https://dash.cloudflare.com/?to=/:account/images/transformations)
+2. Enable for the zone that serves `adm-moments.zelen.uk` (or your admin domain)
+
+Public album thumbnails then use `/cdn-cgi/image/` URLs; private albums still use the auth proxy.
+
 ### PhotoPrism integration
 
 To import photos from PhotoPrism (e.g. on your NAS):
@@ -152,8 +161,12 @@ The monorepo has path-based deployments:
 
 Add these secrets to your GitHub repository (Settings → Secrets and variables → Actions):
 
-- `CLOUDFLARE_API_TOKEN` — API token with Workers/Pages edit and D1 edit
-- `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID
+- `CLOUDFLARE_API_TOKEN` — API token with **Account** permissions: Workers Scripts Edit, Workers KV Storage Edit, D1 Edit, Pages Edit, R2 Object Storage Edit
+- `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID (from dashboard, right sidebar)
+
+**Creating the token:** [My Profile → API Tokens → Create Token](https://dash.cloudflare.com/profile/api-tokens). Use "Edit Cloudflare Workers" template, then add **Account → D1 Edit**. Or create a custom token with the permissions above.
+
+**Error 7403** ("account not valid or not authorized"): Token lacks D1 permission, or `CLOUDFLARE_ACCOUNT_ID` doesn't match the account that owns the D1 database.
 
 ## 9. Key Scripts
 

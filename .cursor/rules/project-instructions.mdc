@@ -13,9 +13,10 @@ alwaysApply: true
 - **Workers/Pages** — moments deploys as Astro+Cloudflare, moments-admin as React Router Worker
 
 **Photo storage & delivery:**
-- **WebDAV** — Uploads go to NAS at `WEBDAV_BASE_URL` (e.g. `https://photo.zelen.uk/originals`). Items store path as `image_id`.
-- **PhotoPrism** — Import from NAS-hosted PhotoPrism. Items store `photoprism:{hash}`. Thumbnails fetched via PhotoPrism API.
-- **Image proxy** — `/api/items/:id/image` serves from WebDAV or PhotoPrism (auth required). Originals stay on NAS.
+- **WebDAV** — Uploads go to NAS at `WEBDAV_BASE_URL`. Items store path as `image_id`.
+- **PhotoPrism** — Import from NAS-hosted PhotoPrism. Items store `photoprism:{hash}`.
+- **Image proxy** — `/api/items/:id/image` (auth) and `/api/public/items/:id/image` (public albums only) serve from WebDAV or PhotoPrism.
+- **Cloudflare Image Resizing** — For public albums, use `/cdn-cgi/image/<options>/<source-url>` for edge caching, resizing (thumb/grid/hero), and format optimization.
 
 **Auth:** Session cookies (signed), bcrypt for passwords. Default user seeded via migration.
 

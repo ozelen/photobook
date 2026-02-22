@@ -11,6 +11,7 @@ export default [
 	route("api/albums/:id/upload", "routes/api.albums.$id.upload.ts"),
 	route("api/albums/:id/items", "routes/api.albums.$id.items.ts"),
 	route("api/items/:id/image", "routes/api.items.$id.image.ts"),
+	route("api/public/items/:id/image", "routes/api.public.items.$id.image.ts"),
 	route("api/photoprism/albums", "routes/api.photoprism.albums.ts"),
 	route("api/photoprism/photos", "routes/api.photoprism.photos.ts"),
 	route("api/photoprism/photos/all", "routes/api.photoprism.photos.all.ts"),

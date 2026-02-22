@@ -25,6 +25,22 @@ export async function listAlbumItems(
 	return (results ?? []) as AlbumItem[];
 }
 
+export async function isItemInPublicAlbum(
+	db: D1Database,
+	itemId: string,
+): Promise<boolean> {
+	const row = await db
+		.prepare(
+			`SELECT 1 FROM album_items ai
+       JOIN albums a ON a.id = ai.album_id
+       WHERE ai.item_id = ? AND a.is_public = 1
+       LIMIT 1`,
+		)
+		.bind(itemId)
+		.first();
+	return !!row;
+}
+
 export async function addItemToAlbum(
 	db: D1Database,
 	albumId: string,

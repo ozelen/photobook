@@ -4,6 +4,7 @@ import type { Route } from "./+types/albums.$id";
 import { getSessionUser } from "../lib/auth.server";
 import { getAlbum, deleteAlbum } from "../lib/albums.server";
 import { listAlbumItems } from "../lib/items.server";
+import { getCfImageUrl } from "../lib/images.server";
 
 interface PhotoPrismAlbum {
 	uid: string;
@@ -39,10 +40,21 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 	if (!album) throw new Response("Not found", { status: 404 });
 
 	const rawItems = await listAlbumItems(context.cloudflare.env.DB, params.id, user.id);
-	const items = rawItems.map((item) => ({
-		...item,
-		thumbUrl: `/api/items/${item.id}/image`,
-	}));
+	const origin = new URL(request.url).origin;
+	const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
+	const items = rawItems.map((item) => {
+		const thumbUrl =
+			album.isPublic === 1
+				? isLocal
+					? `/api/public/items/${item.id}/image`
+					: getCfImageUrl(
+							origin,
+							`${origin}/api/public/items/${item.id}/image`,
+							"thumb",
+						)
+				: `/api/items/${item.id}/image`;
+		return { ...item, thumbUrl };
+	});
 
 	return { album, items };
 }
