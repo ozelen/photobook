@@ -6,8 +6,10 @@ on:
     paths:
       - "moments-admin/**"
       - "moments/db/**"
+      - ".github/workflows/deploy-moments-admin.yml"
       - "package.json"
       - "package-lock.json"
+  workflow_dispatch:
 
 jobs:
   deploy:

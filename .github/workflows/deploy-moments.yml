@@ -5,8 +5,10 @@ on:
     branches: [main]
     paths:
       - "moments/**"
+      - ".github/workflows/deploy-moments.yml"
       - "package.json"
       - "package-lock.json"
+  workflow_dispatch:
 
 jobs:
   deploy:
