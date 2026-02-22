@@ -19,6 +19,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 		return new Response("Not found", { status: 404 });
 	}
 
+	const cached = await caches.default.match(request);
+	if (cached) return cached;
+
 	const imageId = (item as { image_id: string }).image_id;
 	const env = context.cloudflare.env as {
 		WEBDAV_BASE_URL?: string;
@@ -27,14 +30,16 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 		PHOTOPRISM_BASE_URL?: string;
 	};
 
-	const res = await fetchItemImage(imageId, env);
+	let res = await fetchItemImage(imageId, env);
 	if (res.headers.get("Cache-Control") === "public, max-age=86400") {
-		return new Response(res.body, {
+		res = new Response(res.body, {
 			headers: {
 				"Content-Type": res.headers.get("Content-Type") || "image/jpeg",
 				"Cache-Control": "private, max-age=3600",
 			},
 		});
 	}
+	const resToCache = res.clone();
+	await caches.default.put(request, resToCache);
 	return res;
 }

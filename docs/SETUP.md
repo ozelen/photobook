@@ -67,7 +67,7 @@ Images from **public albums** are served via Cloudflare's edge (transform, cache
 1. [Cloudflare Dashboard → Images → Transformations](https://dash.cloudflare.com/?to=/:account/images/transformations)
 2. Enable for the zone that serves `adm-moments.zelen.uk` (or your admin domain)
 
-Public album thumbnails then use `/cdn-cgi/image/` URLs; private albums still use the auth proxy.
+Public album thumbnails then use `/cdn-cgi/image/` URLs; private albums still use the auth proxy. The image proxy uses the Worker Cache API (`caches.default`) to cache responses at the edge, reducing NAS fetches and improving response time.
 
 ### PhotoPrism integration
 
