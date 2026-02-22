@@ -143,7 +143,19 @@ npm run test
 /docs             — Product spec, setup
 ```
 
-## 8. Key Scripts
+## 8. CI/CD (GitHub Actions)
+
+The monorepo has path-based deployments:
+
+- **moments** deploys when `moments/**`, `package.json`, or `package-lock.json` change
+- **moments-admin** deploys when `moments-admin/**`, `moments/db/**`, or root package files change
+
+Add these secrets to your GitHub repository (Settings → Secrets and variables → Actions):
+
+- `CLOUDFLARE_API_TOKEN` — API token with Workers/Pages edit and D1 edit
+- `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID
+
+## 9. Key Scripts
 
 | Script | Description |
 |--------|-------------|
