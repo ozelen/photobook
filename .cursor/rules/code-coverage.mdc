@@ -1,0 +1,9 @@
+
+---
+alwaysApply: true
+---
+
+- Follow TDD approach: think about end result and write a test before implementation
+- Cover core business logic with test cases
+- Run tests before commits, use pre-commit hooks, never skip them
+- Prefer testing high-level flows, not low-level functions

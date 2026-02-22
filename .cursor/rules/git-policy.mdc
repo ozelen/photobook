@@ -1,0 +1,15 @@
+---
+description: "This rule provides standards of version control"
+globs:
+alwaysApply: true
+---
+
+- Commit changes when a logical feature is complete
+- Use pre-commit hooks; unit tests and lints must pass
+- Any database schema change MUST include a migration file
+- Never modify committed migrations
+- Commit messages must explain WHAT and WHY
+- Mention migration names in commit messages when applicable
+- Never introduce float for monetary values
+- Any publish-affecting change must bump public_version and append outbox event
+- Use rebase and keep commit history clean
