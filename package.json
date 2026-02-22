@@ -1,0 +1,24 @@
+{
+  "name": "moments-platform",
+  "private": true,
+  "workspaces": ["moments", "moments-admin"],
+  "scripts": {
+    "dev": "npm run dev --workspace=moments",
+    "dev:admin": "npm run dev --workspace=moments-admin",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:admin\"",
+    "build": "npm run build --workspaces --if-present",
+    "build:site": "npm run build --workspace=moments",
+    "build:admin": "npm run build --workspace=moments-admin",
+    "deploy": "npm run deploy --workspaces --if-present",
+    "db:migrate:local": "npm run db:migrate:local --workspace=moments",
+    "db:migrate:remote": "npm run db:migrate:remote --workspace=moments",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3"
+  }
+}

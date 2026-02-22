@@ -1,0 +1,18 @@
+import { type RouteConfig, index, route } from "@react-router/dev/routes";
+
+export default [
+	index("routes/home.tsx"),
+	route("login", "routes/login.tsx"),
+	route("logout", "routes/logout.tsx"),
+	route("albums", "routes/albums.index.tsx"),
+	route("albums/new", "routes/albums.new.tsx"),
+	route("albums/:id", "routes/albums.$id.tsx"),
+	route("albums/:id/edit", "routes/albums.$id.edit.tsx"),
+	route("api/albums/:id/upload", "routes/api.albums.$id.upload.ts"),
+	route("api/albums/:id/items", "routes/api.albums.$id.items.ts"),
+	route("api/items/:id/image", "routes/api.items.$id.image.ts"),
+	route("api/photoprism/albums", "routes/api.photoprism.albums.ts"),
+	route("api/photoprism/photos", "routes/api.photoprism.photos.ts"),
+	route("api/photoprism/photos/all", "routes/api.photoprism.photos.all.ts"),
+	route("api/photoprism/thumb/:hash", "routes/api.photoprism.thumb.$hash.ts"),
+] satisfies RouteConfig;

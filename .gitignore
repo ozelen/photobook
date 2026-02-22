@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Wrangler local state
+.wrangler/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# Build outputs
+dist/
+.astro/
+.react-router/
+/build/
+
+# Logs
+*.log
+
+# IDE
+.cursor/
+.vscode/
