@@ -124,6 +124,71 @@ export async function getItemTagSlugs(
 	return map;
 }
 
+/** Get tag by slug, or null if not found. */
+export async function getTagBySlug(
+	db: D1Database,
+	slug: string,
+): Promise<PublicTag | null> {
+	const { results } = await db
+		.prepare(
+			`SELECT t.id, t.name, t.slug, 0 as count
+       FROM tags t
+       WHERE t.slug = ?`,
+		)
+		.bind(slug)
+		.all();
+	const row = (results ?? [])[0] as { id: string; name: string; slug: string } | undefined;
+	return row ? { ...row, count: 0 } : null;
+}
+
+/** Most recently tagged item (by tag_refs.created_at) for a tag, or any tag if tagSlug empty. */
+export async function getLatestTaggedItem(
+	db: D1Database,
+	adminBaseUrl: string,
+	tagSlug?: string,
+): Promise<{ itemId: string; thumbUrl: string; alt: string } | null> {
+	const base = adminBaseUrl.replace(/\/$/, "");
+	const itemQuery = tagSlug
+		? `SELECT tr.entity_id as item_id, tr.created_at
+       FROM tag_refs tr
+       JOIN tags t ON t.id = tr.tag_id AND t.slug = ?
+       WHERE tr.entity_type = 'item'
+       ORDER BY tr.created_at DESC
+       LIMIT 1`
+		: `SELECT tr.entity_id as item_id, tr.created_at
+       FROM tag_refs tr
+       WHERE tr.entity_type = 'item'
+       ORDER BY tr.created_at DESC
+       LIMIT 1`;
+
+	const stmt = tagSlug
+		? db.prepare(itemQuery).bind(tagSlug)
+		: db.prepare(itemQuery);
+	const { results } = await stmt.all();
+	const row = (results ?? [])[0] as { item_id: string } | undefined;
+	if (!row) return null;
+
+	const itemId = row.item_id;
+	const inPublicAlbum = await db
+		.prepare(
+			`SELECT a.name FROM album_items ai
+       JOIN albums a ON a.id = ai.album_id AND a.is_public = 1
+       JOIN items i ON i.id = ai.item_id AND i.deleted_at IS NULL AND i.image_id IS NOT NULL
+       WHERE ai.item_id = ?
+       LIMIT 1`,
+		)
+		.bind(itemId)
+		.first();
+	if (!inPublicAlbum) return null;
+
+	const albumName = (inPublicAlbum as { name: string }).name ?? "Photo";
+	return {
+		itemId,
+		thumbUrl: `${base}/api/public/items/${itemId}/image`,
+		alt: albumName,
+	};
+}
+
 /** Top tags used on public albums and items, ordered by usage count. */
 export async function getPublicTags(db: D1Database, limit = 20): Promise<PublicTag[]> {
 	const { results } = await db

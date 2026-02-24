@@ -1,22 +1,38 @@
 ---
 interface Props {
 	initialSection?: "gallery" | "services" | "contact" | "about";
+	initialTag?: string;
+	heroImageUrl?: string;
+	heroImageAlt?: string;
 }
-const { initialSection } = Astro.props;
+const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Astro.props;
 ---
 
 <!-- Hero -->
 <section
 	id="hero"
 	data-page="hero"
-	class="min-w-[100vw] w-[100vw] flex-shrink-0 snap-start flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8"
+	class="min-w-[100vw] w-[100vw] flex-shrink-0 snap-start flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 relative overflow-hidden"
 >
-	<div class="max-w-4xl mx-auto text-center">
-		<h1 class="font-serif text-5xl sm:text-6xl lg:text-7xl font-light text-stone-900 leading-tight tracking-tight">
+	<div id="hero-image-wrap" class="absolute inset-0 z-0">
+		{heroImageUrl && (
+			<>
+				<img
+					id="hero-image"
+					src={heroImageUrl}
+					alt={heroImageAlt}
+					class="w-full h-full object-cover"
+				/>
+				<div class="absolute inset-0 bg-stone-900/50" aria-hidden="true" />
+			</>
+		)}
+	</div>
+	<div class:list={["max-w-4xl mx-auto text-center relative z-10", heroImageUrl && "text-white"]}>
+		<h1 class:list={["font-serif text-5xl sm:text-6xl lg:text-7xl font-light leading-tight tracking-tight", heroImageUrl ? "text-white" : "text-stone-900"]}>
 			Capturing Moments<br />
-			<span class="italic text-stone-600">That Last Forever</span>
+			<span class:list={["italic", heroImageUrl ? "text-white/90" : "text-stone-600"]}>That Last Forever</span>
 		</h1>
-		<p class="mt-8 text-lg sm:text-xl text-stone-600 max-w-2xl mx-auto font-sans">
+		<p class:list={["mt-8 text-lg sm:text-xl max-w-2xl mx-auto font-sans", heroImageUrl ? "text-white/90" : "text-stone-600"]}>
 			Award-winning photography specializing in portrait, landscape, and event photography that tells your unique story.
 		</p>
 		<div class="mt-12 flex flex-wrap justify-center gap-4">
@@ -28,7 +44,10 @@ const { initialSection } = Astro.props;
 			</a>
 			<a
 				href="/contact"
-				class="scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-colors no-underline"
+				class:list={[
+					"scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline",
+					heroImageUrl ? "border border-white/80 text-white hover:bg-white/10" : "border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100",
+				]}
 			>
 				Contact Me
 			</a>
@@ -207,7 +226,7 @@ const { initialSection } = Astro.props;
 	</svg>
 </button>
 
-<script define:vars={{ initialSection }}>
+<script define:vars={{ initialSection, initialTag }}>
 	const SECTIONS = ['hero', 'gallery', 'services', 'contact', 'about'];
 	const SECTION_LABELS = { hero: 'Home', gallery: 'Gallery', services: 'Services', contact: 'Contact', about: 'About' };
 	let skipScrollSync = false;
@@ -215,12 +234,14 @@ const { initialSection } = Astro.props;
 
 	function pathToSection(path) {
 		if (path === '/' || path === '') return 'hero';
-		const p = path.replace(/^\//, '');
+		const p = path.replace(/^\//, '').split('/')[0];
 		return SECTIONS.includes(p) ? p : 'hero';
 	}
 
 	function sectionToPath(section) {
-		return section === 'hero' ? '/' : `/${section}`;
+		if (section === 'hero') return '/';
+		if (section === 'gallery' && /^\/gallery\/[^/]+/.test(location.pathname)) return location.pathname;
+		return `/${section}`;
 	}
 
 	function getSectionFromScroll(scrollEl) {
@@ -230,9 +251,9 @@ const { initialSection } = Astro.props;
 		return SECTIONS[index];
 	}
 
-	function scrollToSection(section) {
+	function scrollToSection(section, instant) {
 		const el = document.getElementById(section);
-		if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+		if (el) el.scrollIntoView({ behavior: instant ? 'instant' : 'smooth', inline: 'start', block: 'nearest' });
 		const path = sectionToPath(section);
 		if (location.pathname !== path) {
 			history.pushState({ section }, '', path);
@@ -284,7 +305,7 @@ const { initialSection } = Astro.props;
 
 		if (initialSection && SECTIONS.includes(initialSection)) {
 			skipScrollSync = true;
-			scrollToSection(initialSection);
+			scrollToSection(initialSection, true);
 			setTimeout(() => {
 				skipScrollSync = false;
 				syncFromScroll();
@@ -304,6 +325,28 @@ const { initialSection } = Astro.props;
 			});
 		});
 
+		document.getElementById('gallery')?.addEventListener('click', (e) => {
+			const link = e.target?.closest?.('.gallery-tag-link');
+			if (!link) return;
+			e.preventDefault();
+			const href = link.getAttribute('href') || '';
+			const tag = href === '/gallery' ? '' : href.replace(/^\/gallery\//, '').split('/')[0];
+			loadGallery(tag);
+			const newPath = tag ? `/gallery/${tag}` : '/gallery';
+			history.pushState({ section: 'gallery', tag }, '', newPath);
+			link.closest('#gallery-tag-buttons')?.querySelectorAll('.gallery-tag-link').forEach((l) => {
+				const lHref = l.getAttribute('href') || '';
+				const lTag = lHref === '/gallery' ? '' : lHref.replace(/^\/gallery\//, '').split('/')[0];
+				const isActive = lTag === tag;
+				l.classList.toggle('bg-stone-900', isActive);
+				l.classList.toggle('text-white', isActive);
+				l.classList.toggle('border-stone-900', isActive);
+				l.classList.toggle('bg-white', !isActive);
+				l.classList.toggle('text-stone-700', !isActive);
+				l.classList.toggle('border-stone-300', !isActive);
+			});
+		});
+
 		if (scroll) {
 			let debounceId = 0;
 			scroll.addEventListener('scroll', () => {
@@ -314,7 +357,9 @@ const { initialSection } = Astro.props;
 
 		window.addEventListener('popstate', (e) => {
 			const section = e.state?.section ?? pathToSection(location.pathname);
-			if (SECTIONS.includes(section)) scrollToSection(section);
+			if (SECTIONS.includes(section)) scrollToSection(section, true);
+			const tag = e.state?.tag ?? (location.pathname.startsWith('/gallery/') ? location.pathname.replace(/^\/gallery\//, '').split('/')[0] : '');
+			loadGallery(tag);
 		});
 
 		const observer = new IntersectionObserver(
@@ -350,29 +395,6 @@ const { initialSection } = Astro.props;
 			if (idx < SECTIONS.length - 1) scrollToSection(SECTIONS[idx + 1]);
 		});
 
-		// Gallery tag filter: fetch from API when tag is clicked
-		const gallerySection = document.getElementById('gallery');
-		if (gallerySection) {
-			gallerySection.addEventListener('click', (e) => {
-				const btn = e.target?.closest?.('.gallery-tag-btn');
-				if (!btn) return;
-				e.preventDefault();
-				e.stopPropagation();
-				const tag = btn.getAttribute('data-gallery-tag') ?? '';
-				gallerySection.querySelectorAll('.gallery-tag-btn').forEach((b) => {
-					const slug = b.getAttribute('data-gallery-tag') ?? '';
-					const isActive = slug === tag;
-					b.classList.toggle('bg-stone-900', isActive);
-					b.classList.toggle('text-white', isActive);
-					b.classList.toggle('border-stone-900', isActive);
-					b.classList.toggle('bg-white', !isActive);
-					b.classList.toggle('text-stone-700', !isActive);
-					b.classList.toggle('border-stone-300', !isActive);
-				});
-				loadGallery(tag);
-			});
-		}
-
 		function loadGallery(tag) {
 			const url = tag ? `/api/gallery.json?tag=${encodeURIComponent(tag)}` : '/api/gallery.json';
 			const gridEl = document.getElementById('gallery-grid');
@@ -387,18 +409,59 @@ const { initialSection } = Astro.props;
 			fetch(url)
 				.then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load gallery'))))
 				.then((data) => {
-					const { galleryItems = [], topTags = [] } = data;
+					const { galleryItems = [], topTags = [], heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt } = data;
 					if (loadingEl) loadingEl.classList.add('hidden');
+					const wrap = document.getElementById('hero-image-wrap');
+					const heroContent = document.querySelector('#hero .max-w-4xl');
+					if (wrap) {
+						if (apiHeroUrl) {
+							wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(apiHeroUrl)}" alt="${escapeHtml(apiHeroAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
+							if (heroContent) {
+								heroContent.classList.add('text-white');
+								heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');
+								heroContent.querySelector('h1 span')?.classList.replace('text-stone-600', 'text-white/90');
+								heroContent.querySelector('p')?.classList.replace('text-stone-600', 'text-white/90');
+								const contactBtn = heroContent.querySelector('a[href="/contact"]');
+								if (contactBtn) contactBtn.className = 'scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-white/80 text-white hover:bg-white/10';
+							}
+						} else {
+							wrap.innerHTML = '';
+							if (heroContent) {
+								heroContent.classList.remove('text-white');
+								heroContent.querySelector('h1')?.classList.replace('text-white', 'text-stone-900');
+								heroContent.querySelector('h1 span')?.classList.replace('text-white/90', 'text-stone-600');
+								heroContent.querySelector('p')?.classList.replace('text-white/90', 'text-stone-600');
+								const contactBtn = heroContent.querySelector('a[href="/contact"]');
+								if (contactBtn) contactBtn.className = 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-colors no-underline';
+							}
+						}
+					}
 					if (tagContainer && !tagContainer.innerHTML.trim() && (galleryItems.length > 0 || topTags.length > 0)) {
+						const currentTag = tag;
+						const allActive = !currentTag;
+						const allClasses = allActive ? 'gallery-tag-link flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm bg-stone-900 text-white hover:bg-stone-800 transition-colors whitespace-nowrap border border-stone-900 no-underline' : 'gallery-tag-link flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm border border-stone-300 text-stone-700 hover:bg-stone-100 hover:border-stone-400 transition-colors whitespace-nowrap bg-white no-underline';
 						const tagButtons =
-							'<button type="button" data-gallery-tag="" class="gallery-tag-btn flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm bg-stone-900 text-white hover:bg-stone-800 transition-colors whitespace-nowrap border border-stone-900">All</button>' +
+							`<a href="/gallery" class="${allClasses}">All</a>` +
 							topTags
-								.map(
-									(t) =>
-										`<button type="button" data-gallery-tag="${escapeHtml(t.slug)}" class="gallery-tag-btn flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm border border-stone-300 text-stone-700 hover:bg-stone-100 hover:border-stone-400 transition-colors whitespace-nowrap bg-white">${escapeHtml(t.name)}</button>`,
-								)
+								.map((t) => {
+									const isActive = currentTag === t.slug;
+									const classes = isActive ? 'gallery-tag-link flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm bg-stone-900 text-white hover:bg-stone-800 transition-colors whitespace-nowrap border border-stone-900 no-underline' : 'gallery-tag-link flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm border border-stone-300 text-stone-700 hover:bg-stone-100 hover:border-stone-400 transition-colors whitespace-nowrap bg-white no-underline';
+									return `<a href="/gallery/${escapeHtml(t.slug)}" class="${classes}">${escapeHtml(t.name)}</a>`;
+								})
 								.join('');
 						tagContainer.innerHTML = tagButtons;
+					} else if (tagContainer && tagContainer.innerHTML.trim()) {
+						tagContainer.querySelectorAll('.gallery-tag-link').forEach((l) => {
+							const lHref = l.getAttribute('href') || '';
+							const lTag = lHref === '/gallery' ? '' : lHref.replace(/^\/gallery\//, '').split('/')[0];
+							const isActive = lTag === tag;
+							l.classList.toggle('bg-stone-900', isActive);
+							l.classList.toggle('text-white', isActive);
+							l.classList.toggle('border-stone-900', isActive);
+							l.classList.toggle('bg-white', !isActive);
+							l.classList.toggle('text-stone-700', !isActive);
+							l.classList.toggle('border-stone-300', !isActive);
+						});
 					}
 					if (gridEl) {
 						gridEl.innerHTML = galleryItems
@@ -421,8 +484,8 @@ const { initialSection } = Astro.props;
 				});
 		}
 
-		// Initial fetch
-		loadGallery('');
+		// Initial fetch (use initialTag from URL when on /gallery/[tag])
+		loadGallery(typeof initialTag !== 'undefined' ? initialTag : '');
 	}
 
 	function escapeHtml(s) {

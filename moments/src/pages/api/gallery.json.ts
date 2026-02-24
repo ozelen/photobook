@@ -4,6 +4,7 @@ import {
 	getItemImageUrl,
 	getPublicTags,
 	getItemTagSlugs,
+	getLatestTaggedItem,
 } from "../../lib/public-albums";
 
 export const GET: APIRoute = async (context) => {
@@ -48,9 +49,17 @@ export const GET: APIRoute = async (context) => {
 	}
 
 	const topTags = await getPublicTags(db);
+	const heroImage = tagFilter
+		? await getLatestTaggedItem(db, adminBaseUrl, tagFilter)
+		: await getLatestTaggedItem(db, adminBaseUrl);
 
 	return new Response(
-		JSON.stringify({ galleryItems, topTags }),
+		JSON.stringify({
+			galleryItems,
+			topTags,
+			heroImageUrl: heroImage?.thumbUrl ?? null,
+			heroImageAlt: heroImage?.alt ?? null,
+		}),
 		{
 			status: 200,
 			headers: {

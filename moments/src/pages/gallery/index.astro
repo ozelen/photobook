@@ -1,9 +1,15 @@
 ---
 import PortfolioLayout from "../../layouts/PortfolioLayout.astro";
 import HomeSections from "../../components/HomeSections.astro";
+import { getLatestTaggedItem } from "../../lib/public-albums";
 import { SITE_TITLE, SITE_DESCRIPTION } from "../../consts";
+
+const runtime = Astro.locals.runtime;
+const db = runtime.env.DB as D1Database;
+const adminBaseUrl = (runtime.env as { ADMIN_BASE_URL?: string }).ADMIN_BASE_URL ?? "https://adm-moments.zelen.uk";
+const heroImage = await getLatestTaggedItem(db, adminBaseUrl);
 ---
 
 <PortfolioLayout title={SITE_TITLE} description={SITE_DESCRIPTION} horizontalScroll={true} currentPath="/gallery">
-	<HomeSections initialSection="gallery" />
+	<HomeSections initialSection="gallery" heroImageUrl={heroImage?.thumbUrl} heroImageAlt={heroImage?.alt} />
 </PortfolioLayout>

@@ -1,43 +1,62 @@
 ---
 import PortfolioLayout from "../../layouts/PortfolioLayout.astro";
-import { getPublicAlbums, getItemImageUrl } from "../../lib/public-albums";
+import HomeSections from "../../components/HomeSections.astro";
+import { getPublicAlbums, getItemImageUrl, getTagBySlug, getLatestTaggedItem } from "../../lib/public-albums";
+import { SITE_DESCRIPTION } from "../../consts";
 
 const { slug } = Astro.params;
 if (!slug) return Astro.redirect("/");
 
 const runtime = Astro.locals.runtime;
-const db = runtime.env.DB;
+const db = runtime.env.DB as D1Database;
 const adminBaseUrl = (runtime.env as { ADMIN_BASE_URL?: string }).ADMIN_BASE_URL ?? "https://adm-moments.zelen.uk";
 
 const albums = await getPublicAlbums(db);
 const album = albums.find((a) => a.slug === slug);
-if (!album) return Astro.redirect("/");
+
+let isAlbum = false;
+let tag = null;
+let heroImage = null;
+
+if (album) {
+	isAlbum = true;
+} else {
+	tag = await getTagBySlug(db, slug);
+	if (!tag) return Astro.redirect("/gallery");
+	heroImage = await getLatestTaggedItem(db, adminBaseUrl, slug);
+}
 ---
 
-<PortfolioLayout title={`${album.name} — Gallery`} description={album.description ?? album.name} currentPath={Astro.url.pathname}>
-	<section class="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
-		<div class="max-w-7xl mx-auto">
-			<div class="mb-12">
-				<a href="/gallery" class="text-stone-600 hover:text-stone-900 text-sm font-medium mb-4 inline-block">
-					← Back to Gallery
-				</a>
-				<h1 class="font-serif text-4xl sm:text-5xl font-light text-stone-900 mt-2">{album.name}</h1>
-				{album.description && (
-					<p class="mt-4 text-stone-600 max-w-2xl">{album.description}</p>
-				)}
+{isAlbum ? (
+	<PortfolioLayout title={`${album!.name} — Gallery`} description={album!.description ?? album!.name} currentPath={Astro.url.pathname}>
+		<section class="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
+			<div class="max-w-7xl mx-auto">
+				<div class="mb-12">
+					<a href="/gallery" class="text-stone-600 hover:text-stone-900 text-sm font-medium mb-4 inline-block">
+						← Back to Gallery
+					</a>
+					<h1 class="font-serif text-4xl sm:text-5xl font-light text-stone-900 mt-2">{album!.name}</h1>
+					{album!.description && (
+						<p class="mt-4 text-stone-600 max-w-2xl">{album!.description}</p>
+					)}
+				</div>
+				<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+					{album!.items.map((item) => (
+						<div class="aspect-square overflow-hidden rounded-sm bg-stone-200">
+							<img
+								src={getItemImageUrl(adminBaseUrl, item.id)}
+								alt=""
+								loading="lazy"
+								class="w-full h-full object-cover"
+							/>
+						</div>
+					))}
+				</div>
 			</div>
-			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-				{album.items.map((item) => (
-					<div class="aspect-square overflow-hidden rounded-sm bg-stone-200">
-						<img
-							src={getItemImageUrl(adminBaseUrl, item.id)}
-							alt=""
-							loading="lazy"
-							class="w-full h-full object-cover"
-						/>
-					</div>
-				))}
-			</div>
-		</div>
-	</section>
-</PortfolioLayout>
+		</section>
+	</PortfolioLayout>
+) : (
+	<PortfolioLayout title={`${tag!.name} — Gallery`} description={SITE_DESCRIPTION} horizontalScroll={true} currentPath={Astro.url.pathname}>
+		<HomeSections initialSection="gallery" initialTag={slug} heroImageUrl={heroImage?.thumbUrl} heroImageAlt={heroImage?.alt} />
+	</PortfolioLayout>
+)}
