@@ -88,7 +88,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 						: getCfImageUrl(origin, baseImageUrl, "hero")
 					: baseImagePath;
 		const tags = itemTagsMap[item.id] ?? [];
-		return { ...item, thumbUrl, gridUrl, heroUrl, tags };
+		// Raw image (no crop) for crop editor - must show full image so object-position works
+		const rawImageUrl = baseImagePath;
+		return { ...item, thumbUrl, gridUrl, heroUrl, rawImageUrl, tags };
 	});
 
 	return { album, items, albumTags, portfolioUrl };
@@ -842,13 +844,7 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 									}}
 								>
 									<img
-										src={
-											editVariant === "thumb"
-												? editItem.thumbUrl
-												: editVariant === "grid"
-													? editItem.gridUrl
-													: editItem.heroUrl ?? editItem.gridUrl
-										}
+										src={editItem.rawImageUrl}
 										alt=""
 										className="w-full h-full object-cover select-none pointer-events-none"
 										style={{
