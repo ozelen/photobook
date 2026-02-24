@@ -213,6 +213,9 @@ CREATE TABLE tags (
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
   kind TEXT,                           -- optional: 'genre'|'style'|'location'|'person'
+  hero_title TEXT,                     -- custom hero headline when tag selected
+  hero_subtitle TEXT,                  -- custom hero subtext when tag selected
+  hero_item_id TEXT,                   -- item id for hero image when tag selected
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

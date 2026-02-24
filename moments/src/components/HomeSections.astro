@@ -27,18 +27,19 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			</>
 		)}
 	</div>
-	<div class:list={["max-w-4xl mx-auto text-center relative z-10", heroImageUrl && "text-white"]}>
-		<h1 class:list={["font-serif text-5xl sm:text-6xl lg:text-7xl font-light leading-tight tracking-tight", heroImageUrl ? "text-white" : "text-stone-900"]}>
+	<div id="hero-content" class:list={["max-w-4xl mx-auto text-center relative z-10", heroImageUrl && "text-white"]}>
+		<h1 id="hero-title" class:list={["font-serif text-5xl sm:text-6xl lg:text-7xl font-light leading-tight tracking-tight", heroImageUrl ? "text-white" : "text-stone-900"]}>
 			Capturing Moments<br />
 			<span class:list={["italic", heroImageUrl ? "text-white/90" : "text-stone-600"]}>That Last Forever</span>
 		</h1>
-		<p class:list={["mt-8 text-lg sm:text-xl max-w-2xl mx-auto font-sans", heroImageUrl ? "text-white/90" : "text-stone-600"]}>
+		<p id="hero-subtitle" class:list={["mt-8 text-lg sm:text-xl max-w-2xl mx-auto font-sans", heroImageUrl ? "text-white/90" : "text-stone-600"]}>
 			Award-winning photography specializing in portrait, landscape, and event photography that tells your unique story.
 		</p>
-		<div class="mt-12 flex flex-wrap justify-center gap-4">
+		<div id="hero-ctas" class="mt-12 flex flex-wrap justify-center gap-4">
 			<a
 				href="/gallery"
-				class="scroll-to-btn inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors no-underline"
+				data-hero-cta="gallery"
+				class="scroll-to-btn hero-cta-link inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors no-underline"
 			>
 				Our Gallery
 			</a>
@@ -230,6 +231,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 	const SECTIONS = ['hero', 'gallery', 'services', 'contact', 'about'];
 	const SECTION_LABELS = { hero: 'Home', gallery: 'Gallery', services: 'Services', contact: 'Contact', about: 'About' };
 	let skipScrollSync = false;
+	let currentHeroTag = '';
 	if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
 	function pathToSection(path) {
@@ -315,14 +317,41 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			updateNavHighlight('hero');
 		}
 
-		document.querySelectorAll('.scroll-to-btn, .nav-scroll-link').forEach((el) => {
-			el.addEventListener('click', (e) => {
-				const path = (el.getAttribute('href') || '/').split('?')[0];
-				if (sectionPaths.includes(path)) {
-					e.preventDefault();
-					scrollToSection(pathToSection(path));
+		document.addEventListener('click', (e) => {
+			const link = e.target?.closest?.('.scroll-to-btn, .nav-scroll-link');
+			if (!link) return;
+			const path = (link.getAttribute('href') || '/').split('?')[0];
+			if (sectionPaths.includes(path)) {
+				e.preventDefault();
+				scrollToSection(pathToSection(path));
+			}
+		});
+
+		document.getElementById('hero')?.addEventListener('click', (e) => {
+			const link = e.target?.closest?.('.hero-cta-link');
+			if (!link) return;
+			const ctaType = link.getAttribute('data-hero-cta');
+			const tagSlug = link.getAttribute('data-tag-slug');
+			const href = link.getAttribute('href') || '';
+			if (ctaType === 'gallery') {
+				e.preventDefault();
+				currentHeroTag = '';
+				loadGallery('');
+				scrollToSection('gallery');
+				history.pushState({ section: 'gallery', tag: '' }, '', '/gallery');
+				return;
+			}
+			if (ctaType === 'tag' && tagSlug) {
+				e.preventDefault();
+				if (currentHeroTag === tagSlug) {
+					window.location.href = `/gallery/${tagSlug}`;
+					return;
 				}
-			});
+				currentHeroTag = tagSlug;
+				loadGallery(tagSlug);
+				scrollToSection('gallery');
+				history.pushState({ section: 'gallery', tag: tagSlug }, '', `/gallery/${tagSlug}`);
+			}
 		});
 
 		document.getElementById('gallery')?.addEventListener('click', (e) => {
@@ -396,6 +425,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 		});
 
 		function loadGallery(tag) {
+			currentHeroTag = tag;
 			const url = tag ? `/api/gallery.json?tag=${encodeURIComponent(tag)}` : '/api/gallery.json';
 			const gridEl = document.getElementById('gallery-grid');
 			const loadingEl = document.getElementById('gallery-loading');
@@ -409,10 +439,22 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			fetch(url)
 				.then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load gallery'))))
 				.then((data) => {
-					const { galleryItems = [], topTags = [], heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt } = data;
+					const { galleryItems = [], topTags = [], heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt } = data;
 					if (loadingEl) loadingEl.classList.add('hidden');
 					const wrap = document.getElementById('hero-image-wrap');
-					const heroContent = document.querySelector('#hero .max-w-4xl');
+					const heroContent = document.getElementById('hero-content');
+					const heroTitleEl = document.getElementById('hero-title');
+					const heroSubtitleEl = document.getElementById('hero-subtitle');
+					const heroCtasEl = document.getElementById('hero-ctas');
+					if (heroTitleEl && apiHeroTitle) {
+						const parts = String(apiHeroTitle).split(' | ');
+						heroTitleEl.innerHTML = parts.length > 1
+							? escapeHtml(parts[0]) + '<br /><span class="italic">' + escapeHtml(parts.slice(1).join(' | ')) + '</span>'
+							: escapeHtml(apiHeroTitle);
+					}
+					if (heroSubtitleEl && apiHeroSubtitle) {
+						heroSubtitleEl.textContent = apiHeroSubtitle;
+					}
 					if (wrap) {
 						if (apiHeroUrl) {
 							wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(apiHeroUrl)}" alt="${escapeHtml(apiHeroAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
@@ -435,6 +477,26 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 								if (contactBtn) contactBtn.className = 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-colors no-underline';
 							}
 						}
+					}
+					if (heroCtasEl) {
+						const isGalleryPrimary = !tag;
+						const hasHeroImage = !!apiHeroUrl;
+						const galleryClasses = isGalleryPrimary
+							? 'hero-cta-link scroll-to-btn inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors no-underline'
+							: (hasHeroImage ? 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-white/80 text-white hover:bg-white/10' : 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100');
+						const tagCtaClasses = (t) => {
+							const active = tag === t.slug;
+							return active
+								? 'hero-cta-link inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors no-underline'
+								: (hasHeroImage ? 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-white/80 text-white hover:bg-white/10' : 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100');
+						};
+						const contactClasses = hasHeroImage
+							? 'scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-white/80 text-white hover:bg-white/10'
+							: 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-colors no-underline';
+						const tagButtons = topTags.map((t) =>
+							`<a href="/gallery/${escapeHtml(t.slug)}" data-hero-cta="tag" data-tag-slug="${escapeHtml(t.slug)}" class="${tagCtaClasses(t)}">${escapeHtml(t.name)}</a>`
+						).join('');
+						heroCtasEl.innerHTML = `<a href="/gallery" data-hero-cta="gallery" class="${galleryClasses}">Our Gallery</a>${tagButtons}<a href="/contact" class="${contactClasses}">Contact Me</a>`;
 					}
 					if (tagContainer && !tagContainer.innerHTML.trim() && (galleryItems.length > 0 || topTags.length > 0)) {
 						const currentTag = tag;

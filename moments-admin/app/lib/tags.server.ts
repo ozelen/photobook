@@ -10,6 +10,9 @@ export interface Tag {
 	name: string;
 	slug: string;
 	kind: string | null;
+	heroTitle: string | null;
+	heroSubtitle: string | null;
+	heroItemId: string | null;
 }
 
 function toTag(row: Record<string, unknown>): Tag {
@@ -18,6 +21,9 @@ function toTag(row: Record<string, unknown>): Tag {
 		name: row.name as string,
 		slug: row.slug as string,
 		kind: (row.kind as string) || null,
+		heroTitle: (row.hero_title as string) || null,
+		heroSubtitle: (row.hero_subtitle as string) || null,
+		heroItemId: (row.hero_item_id as string) || null,
 	};
 }
 
@@ -31,9 +37,52 @@ function tagSlug(name: string): string {
 
 export async function listTags(db: D1Database): Promise<Tag[]> {
 	const { results } = await db
-		.prepare("SELECT id, name, slug, kind FROM tags ORDER BY name ASC")
+		.prepare(
+			"SELECT id, name, slug, kind, hero_title, hero_subtitle, hero_item_id FROM tags ORDER BY name ASC",
+		)
 		.all();
 	return (results ?? []).map((r) => toTag(r as Record<string, unknown>));
+}
+
+export async function getTag(db: D1Database, id: string): Promise<Tag | null> {
+	const row = await db
+		.prepare(
+			"SELECT id, name, slug, kind, hero_title, hero_subtitle, hero_item_id FROM tags WHERE id = ?",
+		)
+		.bind(id)
+		.first();
+	return row ? toTag(row as Record<string, unknown>) : null;
+}
+
+export async function updateTag(
+	db: D1Database,
+	id: string,
+	updates: {
+		name?: string;
+		slug?: string;
+		heroTitle?: string | null;
+		heroSubtitle?: string | null;
+		heroItemId?: string | null;
+	},
+): Promise<Tag | null> {
+	const tag = await getTag(db, id);
+	if (!tag) return null;
+
+	const name = updates.name ?? tag.name;
+	const slug = updates.slug ?? tag.slug;
+	const heroTitle = updates.heroTitle !== undefined ? updates.heroTitle : tag.heroTitle;
+	const heroSubtitle =
+		updates.heroSubtitle !== undefined ? updates.heroSubtitle : tag.heroSubtitle;
+	const heroItemId =
+		updates.heroItemId !== undefined ? updates.heroItemId : tag.heroItemId;
+
+	await db
+		.prepare(
+			`UPDATE tags SET name = ?, slug = ?, hero_title = ?, hero_subtitle = ?, hero_item_id = ? WHERE id = ?`,
+		)
+		.bind(name, slug, heroTitle ?? null, heroSubtitle ?? null, heroItemId ?? null, id)
+		.run();
+	return getTag(db, id);
 }
 
 export async function getOrCreateTag(
@@ -44,7 +93,9 @@ export async function getOrCreateTag(
 	if (!slug) return null;
 
 	const existing = await db
-		.prepare("SELECT id, name, slug, kind FROM tags WHERE slug = ?")
+		.prepare(
+			"SELECT id, name, slug, kind, hero_title, hero_subtitle, hero_item_id FROM tags WHERE slug = ?",
+		)
 		.bind(slug)
 		.first();
 	if (existing) return toTag(existing as Record<string, unknown>);
@@ -56,7 +107,15 @@ export async function getOrCreateTag(
 		)
 		.bind(id, name.trim(), slug)
 		.run();
-	return { id, name: name.trim(), slug, kind: null };
+	return {
+		id,
+		name: name.trim(),
+		slug,
+		kind: null,
+		heroTitle: null,
+		heroSubtitle: null,
+		heroItemId: null,
+	};
 }
 
 export async function getTagsForEntity(
@@ -66,7 +125,7 @@ export async function getTagsForEntity(
 ): Promise<Tag[]> {
 	const { results } = await db
 		.prepare(
-			`SELECT t.id, t.name, t.slug, t.kind
+			`SELECT t.id, t.name, t.slug, t.kind, t.hero_title, t.hero_subtitle, t.hero_item_id
        FROM tag_refs tr
        JOIN tags t ON t.id = tr.tag_id
        WHERE tr.entity_type = ? AND tr.entity_id = ?
@@ -161,7 +220,7 @@ export async function getTagsForEntities(
 	const placeholders = entityIds.map(() => "?").join(",");
 	const { results } = await db
 		.prepare(
-			`SELECT tr.entity_id, t.id, t.name, t.slug, t.kind
+			`SELECT tr.entity_id, t.id, t.name, t.slug, t.kind, t.hero_title, t.hero_subtitle, t.hero_item_id
        FROM tag_refs tr
        JOIN tags t ON t.id = tr.tag_id
        WHERE tr.entity_type = ? AND tr.entity_id IN (${placeholders})
@@ -172,9 +231,25 @@ export async function getTagsForEntities(
 
 	const map: Record<string, Tag[]> = {};
 	for (const id of entityIds) map[id] = [];
-	for (const row of (results ?? []) as { entity_id: string; id: string; name: string; slug: string; kind: string | null }[]) {
-		const tag: Tag = { id: row.id, name: row.name, slug: row.slug, kind: row.kind };
-		map[row.entity_id].push(tag);
+	for (const row of (results ?? []) as {
+		entity_id: string;
+		id: string;
+		name: string;
+		slug: string;
+		kind: string | null;
+		hero_title: string | null;
+		hero_subtitle: string | null;
+		hero_item_id: string | null;
+	}[]) {
+		map[row.entity_id].push({
+			id: row.id,
+			name: row.name,
+			slug: row.slug,
+			kind: row.kind,
+			heroTitle: row.hero_title ?? null,
+			heroSubtitle: row.hero_subtitle ?? null,
+			heroItemId: row.hero_item_id ?? null,
+		});
 	}
 	return map;
 }

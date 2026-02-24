@@ -81,6 +81,12 @@ export default function App() {
 								>
 									Gallery
 								</a>
+								<a
+									href="/tags"
+									className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+								>
+									Tags
+								</a>
 							</div>
 							<div className="flex items-center gap-4">
 								<span className="text-sm text-gray-600 dark:text-gray-400">

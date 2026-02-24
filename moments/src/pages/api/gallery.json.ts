@@ -5,7 +5,12 @@ import {
 	getPublicTags,
 	getItemTagSlugs,
 	getLatestTaggedItem,
+	getTagBySlug,
 } from "../../lib/public-albums";
+
+const DEFAULT_HERO_TITLE = "Capturing Moments | That Last Forever";
+const DEFAULT_HERO_SUBTITLE =
+	"Award-winning photography specializing in portrait, landscape, and event photography that tells your unique story.";
 
 export const GET: APIRoute = async (context) => {
 	const runtime = context.locals.runtime;
@@ -48,15 +53,25 @@ export const GET: APIRoute = async (context) => {
 		);
 	}
 
-	const topTags = await getPublicTags(db);
-	const heroImage = tagFilter
-		? await getLatestTaggedItem(db, adminBaseUrl, tagFilter)
-		: await getLatestTaggedItem(db, adminBaseUrl);
+	const [topTags, heroImage, tag] = await Promise.all([
+		getPublicTags(db),
+		tagFilter
+			? getLatestTaggedItem(db, adminBaseUrl, tagFilter)
+			: getLatestTaggedItem(db, adminBaseUrl),
+		tagFilter ? getTagBySlug(db, tagFilter) : null,
+	]);
+
+	const heroTitle =
+		tag?.heroTitle ?? DEFAULT_HERO_TITLE;
+	const heroSubtitle =
+		tag?.heroSubtitle ?? DEFAULT_HERO_SUBTITLE;
 
 	return new Response(
 		JSON.stringify({
 			galleryItems,
 			topTags,
+			heroTitle,
+			heroSubtitle,
 			heroImageUrl: heroImage?.thumbUrl ?? null,
 			heroImageAlt: heroImage?.alt ?? null,
 		}),

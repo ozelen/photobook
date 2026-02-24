@@ -77,6 +77,9 @@ export interface PublicTag {
 	name: string;
 	slug: string;
 	count: number;
+	heroTitle?: string | null;
+	heroSubtitle?: string | null;
+	heroItemId?: string | null;
 }
 
 /** Returns map of entityId -> tag slugs. entityType: 'album' | 'item'. */
@@ -137,44 +140,86 @@ export async function getTagBySlug(
 ): Promise<PublicTag | null> {
 	const { results } = await db
 		.prepare(
-			`SELECT t.id, t.name, t.slug, 0 as count
+			`SELECT t.id, t.name, t.slug, t.hero_title, t.hero_subtitle, t.hero_item_id, 0 as count
        FROM tags t
        WHERE t.slug = ?`,
 		)
 		.bind(slug)
 		.all();
-	const row = (results ?? [])[0] as { id: string; name: string; slug: string } | undefined;
-	return row ? { ...row, count: 0 } : null;
+	const row = (results ?? [])[0] as {
+		id: string;
+		name: string;
+		slug: string;
+		hero_title: string | null;
+		hero_subtitle: string | null;
+		hero_item_id: string | null;
+	} | undefined;
+	return row
+		? {
+				...row,
+				count: 0,
+				heroTitle: row.hero_title ?? null,
+				heroSubtitle: row.hero_subtitle ?? null,
+				heroItemId: row.hero_item_id ?? null,
+			}
+		: null;
 }
 
-/** Most recently tagged item (by tag_refs.created_at) for a tag, or any tag if tagSlug empty. */
+/** Most recently tagged item (by tag_refs.created_at) for a tag, or any tag if tagSlug empty.
+ * When tagSlug is set and the tag has hero_item_id, uses that item instead. */
 export async function getLatestTaggedItem(
 	db: D1Database,
 	adminBaseUrl: string,
 	tagSlug?: string,
 ): Promise<{ itemId: string; thumbUrl: string; alt: string } | null> {
 	const base = adminBaseUrl.replace(/\/$/, "");
-	const itemQuery = tagSlug
-		? `SELECT tr.entity_id as item_id, tr.created_at
-       FROM tag_refs tr
-       JOIN tags t ON t.id = tr.tag_id AND t.slug = ?
-       WHERE tr.entity_type = 'item'
-       ORDER BY tr.created_at DESC
-       LIMIT 1`
-		: `SELECT tr.entity_id as item_id, tr.created_at
-       FROM tag_refs tr
-       WHERE tr.entity_type = 'item'
-       ORDER BY tr.created_at DESC
-       LIMIT 1`;
 
-	const stmt = tagSlug
-		? db.prepare(itemQuery).bind(tagSlug)
-		: db.prepare(itemQuery);
-	const { results } = await stmt.all();
-	const row = (results ?? [])[0] as { item_id: string } | undefined;
-	if (!row) return null;
+	let itemId: string | null = null;
 
-	const itemId = row.item_id;
+	if (tagSlug) {
+		const tagRow = await db
+			.prepare("SELECT hero_item_id FROM tags WHERE slug = ?")
+			.bind(tagSlug)
+			.first();
+		const heroItemId = (tagRow as { hero_item_id: string | null } | undefined)
+			?.hero_item_id;
+		if (heroItemId) {
+			const inPublic = await db
+				.prepare(
+					`SELECT a.name FROM album_items ai
+         JOIN albums a ON a.id = ai.album_id AND a.is_public = 1
+         JOIN items i ON i.id = ai.item_id AND i.deleted_at IS NULL AND i.image_id IS NOT NULL
+         WHERE ai.item_id = ?
+         LIMIT 1`,
+				)
+				.bind(heroItemId)
+				.first();
+			if (inPublic) itemId = heroItemId;
+		}
+	}
+
+	if (!itemId) {
+		const itemQuery = tagSlug
+			? `SELECT tr.entity_id as item_id, tr.created_at
+         FROM tag_refs tr
+         JOIN tags t ON t.id = tr.tag_id AND t.slug = ?
+         WHERE tr.entity_type = 'item'
+         ORDER BY tr.created_at DESC
+         LIMIT 1`
+			: `SELECT tr.entity_id as item_id, tr.created_at
+         FROM tag_refs tr
+         WHERE tr.entity_type = 'item'
+         ORDER BY tr.created_at DESC
+         LIMIT 1`;
+
+		const stmt = tagSlug
+			? db.prepare(itemQuery).bind(tagSlug)
+			: db.prepare(itemQuery);
+		const { results } = await stmt.all();
+		const row = (results ?? [])[0] as { item_id: string } | undefined;
+		if (!row) return null;
+		itemId = row.item_id;
+	}
 	const inPublicAlbum = await db
 		.prepare(
 			`SELECT a.name FROM album_items ai
@@ -199,7 +244,7 @@ export async function getLatestTaggedItem(
 export async function getPublicTags(db: D1Database, limit = 20): Promise<PublicTag[]> {
 	const { results } = await db
 		.prepare(
-			`SELECT t.id, t.name, t.slug, COUNT(*) as count
+			`SELECT t.id, t.name, t.slug, t.hero_title, t.hero_subtitle, t.hero_item_id, COUNT(*) as count
        FROM tag_refs tr
        JOIN tags t ON t.id = tr.tag_id
        WHERE
@@ -210,11 +255,28 @@ export async function getPublicTags(db: D1Database, limit = 20): Promise<PublicT
            JOIN albums a ON a.id = ai.album_id AND a.is_public = 1
            JOIN items i ON i.id = ai.item_id AND i.deleted_at IS NULL
          ))
-       GROUP BY t.id, t.name, t.slug
+       GROUP BY t.id, t.name, t.slug, t.hero_title, t.hero_subtitle, t.hero_item_id
        ORDER BY count DESC
        LIMIT ?`,
 		)
 		.bind(limit)
 		.all();
-	return (results ?? []) as PublicTag[];
+	const rows = (results ?? []) as {
+		id: string;
+		name: string;
+		slug: string;
+		hero_title: string | null;
+		hero_subtitle: string | null;
+		hero_item_id: string | null;
+		count: number;
+	}[];
+	return rows.map((r) => ({
+		id: r.id,
+		name: r.name,
+		slug: r.slug,
+		count: r.count,
+		heroTitle: r.hero_title ?? null,
+		heroSubtitle: r.hero_subtitle ?? null,
+		heroItemId: r.hero_item_id ?? null,
+	}));
 }

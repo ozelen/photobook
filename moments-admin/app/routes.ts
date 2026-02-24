@@ -9,6 +9,8 @@ export default [
 	route("albums/new", "routes/albums.new.tsx"),
 	route("albums/:id", "routes/albums.$id.tsx"),
 	route("albums/:id/edit", "routes/albums.$id.edit.tsx"),
+	route("tags", "routes/tags.index.tsx"),
+	route("tags/:id/edit", "routes/tags.$id.edit.tsx"),
 	route("api/albums/:id/upload", "routes/api.albums.$id.upload.ts"),
 	route("api/albums/:id/items", "routes/api.albums.$id.items.ts"),
 	route("api/albums/:id/items/tags", "routes/api.albums.$id.items.tags.ts"),
