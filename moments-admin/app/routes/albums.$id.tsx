@@ -4,6 +4,7 @@ import type { Route } from "./+types/albums.$id";
 import { getSessionUser } from "../lib/auth.server";
 import { getAlbum, deleteAlbum } from "../lib/albums.server";
 import { listAlbumItems } from "../lib/items.server";
+import { getTagsForEntity, getTagsForEntities } from "../lib/tags.server";
 import { getCfImageUrl, getCfImagesDeliveryUrl } from "../lib/images.server";
 
 interface PhotoPrismAlbum {
@@ -40,6 +41,12 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 	if (!album) throw new Response("Not found", { status: 404 });
 
 	const rawItems = await listAlbumItems(context.cloudflare.env.DB, params.id, user.id);
+	const albumTags = await getTagsForEntity(context.cloudflare.env.DB, "album", params.id);
+	const itemTagsMap = await getTagsForEntities(
+		context.cloudflare.env.DB,
+		"item",
+		rawItems.map((i) => i.id),
+	);
 	const origin = new URL(request.url).origin;
 	const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
 	const portfolioUrl =
@@ -61,10 +68,11 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 								"thumb",
 							)
 					: `/api/items/${item.id}/image`;
-		return { ...item, thumbUrl };
+		const tags = itemTagsMap[item.id] ?? [];
+		return { ...item, thumbUrl, tags };
 	});
 
-	return { album, items, portfolioUrl };
+	return { album, items, albumTags, portfolioUrl };
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
@@ -82,7 +90,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 }
 
 export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
-	const { album, items, portfolioUrl } = loaderData;
+	const { album, items, albumTags, portfolioUrl } = loaderData;
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [uploadError, setUploadError] = useState<string | null>(null);
 	const [uploading, setUploading] = useState(false);
@@ -102,6 +110,9 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 
 	const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
 	const [deleting, setDeleting] = useState(false);
+	const [tagModalOpen, setTagModalOpen] = useState(false);
+	const [tagInput, setTagInput] = useState("");
+	const [tagging, setTagging] = useState(false);
 
 	const PP_PAGE_SIZE = 24;
 
@@ -274,6 +285,35 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 		});
 	}
 
+	async function handleTagSelected() {
+		const tagNames = tagInput
+			.split(/[,\s]+/)
+			.map((t) => t.trim())
+			.filter(Boolean);
+		if (tagNames.length === 0 || selectedItemIds.size === 0) return;
+		setTagging(true);
+		try {
+			const res = await fetch(`/api/albums/${album.id}/items/tags`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					itemIds: Array.from(selectedItemIds),
+					tagNames,
+				}),
+			});
+			if (res.ok) {
+				setTagModalOpen(false);
+				setTagInput("");
+				revalidator.revalidate();
+			} else {
+				const data = (await res.json()) as { error?: string };
+				alert(data.error ?? "Failed to add tags");
+			}
+		} finally {
+			setTagging(false);
+		}
+	}
+
 	return (
 		<div>
 			<div className="flex justify-between items-start mb-6">
@@ -322,6 +362,18 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 				<p className="text-gray-600 dark:text-gray-300 mb-6">
 					{album.description}
 				</p>
+			)}
+			{albumTags.length > 0 && (
+				<div className="flex flex-wrap gap-2 mb-6">
+					{albumTags.map((t) => (
+						<span
+							key={t.id}
+							className="px-2 py-1 text-xs rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+						>
+							{t.name}
+						</span>
+					))}
+				</div>
 			)}
 
 			<div className="mb-4 flex items-center gap-3">
@@ -469,6 +521,49 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 				</div>
 			)}
 
+			{tagModalOpen && (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+					onClick={() => setTagModalOpen(false)}
+				>
+					<div
+						className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full p-4"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+							Add tags to {selectedItemIds.size} photo(s)
+						</h3>
+						<input
+							type="text"
+							value={tagInput}
+							onChange={(e) => setTagInput(e.target.value)}
+							placeholder="portrait, wedding, outdoors"
+							className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white mb-4"
+						/>
+						<p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+							Comma-separated. Tags are normalized and shared.
+						</p>
+						<div className="flex justify-end gap-2">
+							<button
+								type="button"
+								onClick={() => setTagModalOpen(false)}
+								className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={handleTagSelected}
+								disabled={tagging || !tagInput.trim()}
+								className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
+							>
+								{tagging ? "Adding…" : "Add tags"}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+
 			{items.length > 0 ? (
 				<>
 					{selectedItemIds.size > 0 && (
@@ -482,6 +577,13 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 								className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 							>
 								Clear
+							</button>
+							<button
+								type="button"
+								onClick={() => setTagModalOpen(true)}
+								className="px-4 py-2 border border-gray-600 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg font-medium text-sm"
+							>
+								Tag selected
 							</button>
 							<button
 								type="button"
@@ -521,6 +623,19 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 										<span className="absolute top-2 right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
 											✓
 										</span>
+									)}
+									{item.tags && item.tags.length > 0 && (
+										<div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 p-2 bg-black/60">
+											{item.tags.map((t) => (
+												<span
+													key={t.id}
+													className="px-1.5 py-0.5 text-xs rounded bg-white/20 text-white truncate max-w-[80px]"
+													title={t.name}
+												>
+													{t.name}
+												</span>
+											))}
+										</div>
 									)}
 								</button>
 							</li>

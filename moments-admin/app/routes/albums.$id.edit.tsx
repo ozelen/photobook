@@ -3,6 +3,7 @@ import { Form, redirect } from "react-router";
 import type { Route } from "./+types/albums.$id.edit";
 import { getSessionUser } from "../lib/auth.server";
 import { getAlbum, updateAlbum, isValidKind } from "../lib/albums.server";
+import { getTagsForEntity, setTagsForEntity } from "../lib/tags.server";
 import { slugify } from "../lib/slugify";
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -19,7 +20,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 
 	const album = await getAlbum(context.cloudflare.env.DB, params.id, user.id);
 	if (!album) throw new Response("Not found", { status: 404 });
-	return { album };
+	const tags = await getTagsForEntity(context.cloudflare.env.DB, "album", params.id);
+	return { album, tags };
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
@@ -33,6 +35,10 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 	const kind = String(formData.get("kind") ?? "portfolio");
 	const description = String(formData.get("description") ?? "").trim();
 	const isPublic = formData.get("isPublic") === "on";
+	const tagsRaw = String(formData.get("tags") ?? "").trim();
+	const tagNames = tagsRaw
+		? tagsRaw.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean)
+		: [];
 
 	if (!name) {
 		return { error: "Name is required" };
@@ -49,12 +55,15 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 		isPublic,
 	});
 
-	if (album) return redirect(`/albums/${album.id}`);
+	if (album) {
+		await setTagsForEntity(context.cloudflare.env.DB, "album", params.id, tagNames);
+		return redirect(`/albums/${album.id}`);
+	}
 	return { error: "Failed to update" };
 }
 
 export default function AlbumEdit({ loaderData, actionData }: Route.ComponentProps) {
-	const { album } = loaderData;
+	const { album, tags } = loaderData;
 	const slugRef = useRef<HTMLInputElement>(null);
 
 	function handleNameInput(e: React.FormEvent<HTMLInputElement>) {
@@ -139,6 +148,25 @@ export default function AlbumEdit({ loaderData, actionData }: Route.ComponentPro
 						defaultValue={album.description ?? ""}
 						className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 					/>
+				</div>
+				<div>
+					<label
+						htmlFor="tags"
+						className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+					>
+						Tags
+					</label>
+					<input
+						id="tags"
+						name="tags"
+						type="text"
+						defaultValue={tags.map((t) => t.name).join(", ")}
+						placeholder="portrait, wedding, outdoors"
+						className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+					/>
+					<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						Comma-separated. Tags are normalized and shared across albums and photos.
+					</p>
 				</div>
 				<div className="flex items-center gap-2">
 					<input
