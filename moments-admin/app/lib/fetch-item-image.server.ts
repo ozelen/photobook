@@ -53,7 +53,7 @@ export async function fetchItemImage(
 				PHOTOPRISM_BASE_URL,
 				hash,
 				previewToken,
-				"tile_224",
+				"fit_720",
 			);
 			let thumbRes = await fetch(thumbUrl, { headers: { Accept: "image/*" } });
 			if (!thumbRes.ok) {

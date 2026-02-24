@@ -97,7 +97,7 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 	const ppScrollRef = useRef<HTMLDivElement>(null);
 	const revalidator = useRevalidator();
 
-	const PP_PAGE_SIZE = 48;
+	const PP_PAGE_SIZE = 24;
 
 	useEffect(() => {
 		if (!photoprismOpen) return;

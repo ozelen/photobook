@@ -21,7 +21,8 @@ dist/
 # Logs
 *.log
 
-# IDE (keep .cursor/rules for repo instructions)
+# IDE (keep .cursor/rules and commands for repo instructions)
 .cursor/*
 !.cursor/rules/
+!.cursor/commands/
 .vscode/

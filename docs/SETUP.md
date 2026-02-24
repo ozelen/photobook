@@ -77,7 +77,7 @@ When configured, selected photos (from PhotoPrism or WebDAV upload) are queued a
 2. Create an API token with **Account → Cloudflare Images → Edit**.
 3. Set `moments-admin/wrangler.json` vars: `CF_IMAGES_ACCOUNT_ID`, `CF_IMAGES_DELIVERY_HASH`.
 4. Add secret: `wrangler secret put CF_IMAGES_API_TOKEN` (from `moments-admin`).
-5. The queue `cf-images-upload` is created automatically. Background jobs fetch from NAS (PhotoPrism `fit_1920` or WebDAV) and upload via CF Images API.
+5. The queue `cf-images-upload` is created by CI on first deploy. For manual deploy, run `wrangler queues create cf-images-upload --message-retention-period-secs 86400` from `moments-admin` if it doesn't exist. Background jobs fetch from NAS (PhotoPrism `fit_1920` or WebDAV) and upload via CF Images API.
 
 ### PhotoPrism integration
 
