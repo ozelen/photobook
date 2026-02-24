@@ -1,18 +1,23 @@
 ---
 import PortfolioLayout from "../layouts/PortfolioLayout.astro";
+import HomeSections from "../components/HomeSections.astro";
+import { SITE_TITLE, SITE_DESCRIPTION } from "../consts";
+import { getPublicAlbums, getItemImageUrl } from "../lib/public-albums";
+
+const runtime = Astro.locals.runtime;
+const db = runtime.env.DB;
+const adminBaseUrl = (runtime.env as { ADMIN_BASE_URL?: string }).ADMIN_BASE_URL ?? "https://adm-moments.zelen.uk";
+
+const albums = await getPublicAlbums(db as D1Database);
+const galleryItems = albums.flatMap((a) =>
+	a.items.slice(0, 12).map((item) => ({
+		...item,
+		albumName: a.name,
+		thumbUrl: getItemImageUrl(adminBaseUrl, item.id),
+	})),
+);
 ---
 
-<PortfolioLayout title="About — Moments" description="About the photographer" currentPath="/about">
-	<section class="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
-		<div class="max-w-2xl mx-auto prose prose-stone">
-			<h1 class="font-serif text-4xl font-light text-stone-900">About</h1>
-			<p class="text-stone-600 mt-6">
-				I'm a professional photographer specializing in portrait, landscape, and event photography.
-				With years of experience, I blend technical expertise with creative vision to tell compelling visual stories.
-			</p>
-			<p class="text-stone-600 mt-4">
-				<a href="/contact" class="text-stone-900 font-medium hover:underline">Get in touch</a> to discuss your project.
-			</p>
-		</div>
-	</section>
+<PortfolioLayout title="About — Moments" description="About the photographer" horizontalScroll={true} currentPath="/about">
+	<HomeSections albums={albums} galleryItems={galleryItems} adminBaseUrl={adminBaseUrl} initialSection="about" />
 </PortfolioLayout>

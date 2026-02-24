@@ -24,35 +24,21 @@ function isActive(path: string, current: string): boolean {
 		<div class="flex items-center gap-8">
 			{horizontalScroll ? (
 				<>
-					<a
-						href="/"
-						class:list={["nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline", { "nav-active text-stone-900 font-semibold": isActive("/", path) }]}
-						aria-current={isActive("/", path) ? "page" : undefined}
-					>
+					<a href="/" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
 						Home
 					</a>
-					<a
-						href="/gallery"
-						class:list={["nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline", { "nav-active text-stone-900 font-semibold": isActive("/gallery", path) }]}
-						aria-current={isActive("/gallery", path) ? "page" : undefined}
-					>
+					<a href="/gallery" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
 						Gallery
 					</a>
-					<a
-						href="/services"
-						class:list={["nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline", { "nav-active text-stone-900 font-semibold": isActive("/services", path) }]}
-						aria-current={isActive("/services", path) ? "page" : undefined}
-					>
+					<a href="/services" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
 						Services
 					</a>
-					<a
-						href="/contact"
-						class:list={["nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline", { "nav-active text-stone-900 font-semibold": isActive("/contact", path) }]}
-						aria-current={isActive("/contact", path) ? "page" : undefined}
-					>
+					<a href="/contact" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
 						Contact
 					</a>
-					<HeaderLink href="/about">About</HeaderLink>
+					<a href="/about" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
+						About
+					</a>
 				</>
 			) : (
 				<>
