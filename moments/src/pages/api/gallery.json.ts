@@ -30,7 +30,7 @@ export const GET: APIRoute = async (context) => {
 			albumId: a.id,
 			albumName: a.name,
 			albumSlug: a.slug,
-			thumbUrl: getItemImageUrl(adminBaseUrl, item.id),
+			thumbUrl: getItemImageUrl(adminBaseUrl, item.id, "thumb"),
 		})),
 	);
 	const itemTagSlugs = await getItemTagSlugs(db, rawItems);

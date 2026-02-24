@@ -61,9 +61,15 @@ export async function getPublicAlbums(db: D1Database): Promise<PublicAlbum[]> {
 	return result;
 }
 
-export function getItemImageUrl(adminBaseUrl: string, itemId: string): string {
+export type ImageVariant = "thumb" | "hero";
+
+export function getItemImageUrl(
+	adminBaseUrl: string,
+	itemId: string,
+	variant: ImageVariant = "thumb",
+): string {
 	const base = adminBaseUrl.replace(/\/$/, "");
-	return `${base}/api/public/items/${itemId}/image`;
+	return `${base}/api/public/items/${itemId}/image?variant=${variant}`;
 }
 
 export interface PublicTag {
@@ -184,7 +190,7 @@ export async function getLatestTaggedItem(
 	const albumName = (inPublicAlbum as { name: string }).name ?? "Photo";
 	return {
 		itemId,
-		thumbUrl: `${base}/api/public/items/${itemId}/image`,
+		thumbUrl: getItemImageUrl(base, itemId, "hero"),
 		alt: albumName,
 	};
 }

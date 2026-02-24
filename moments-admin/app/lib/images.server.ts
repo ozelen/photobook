@@ -10,7 +10,7 @@ export type ImageVariant = "thumb" | "grid" | "hero";
 const VARIANT_OPTIONS: Record<ImageVariant, string> = {
 	thumb: "width=500,height=500,fit=cover,quality=85",
 	grid: "width=720,height=720,fit=inside,quality=85",
-	hero: "width=1920,height=1080,fit=inside,quality=85",
+	hero: "width=1920,height=1080,fit=cover,quality=85",
 };
 
 /**
@@ -18,14 +18,20 @@ const VARIANT_OPTIONS: Record<ImageVariant, string> = {
  * @param origin - e.g. https://adm-moments.zelen.uk
  * @param sourceUrl - full URL to the source image (must be publicly accessible)
  * @param variant - thumb | grid | hero
+ * @param gravity - optional focal point {x,y} 0-1 for fit=cover
  */
 export function getCfImageUrl(
 	origin: string,
 	sourceUrl: string,
 	variant: ImageVariant = "thumb",
+	gravity?: { x: number; y: number },
 ): string {
 	const base = origin.replace(/\/$/, "");
-	const options = VARIANT_OPTIONS[variant];
+	let options = VARIANT_OPTIONS[variant];
+	if (gravity && (variant === "thumb" || variant === "hero")) {
+		const g = `${gravity.x},${gravity.y}`;
+		options = `${options},gravity=${g}`;
+	}
 	return `${base}/cdn-cgi/image/${options}/${sourceUrl}`;
 }
 

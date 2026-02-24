@@ -44,7 +44,7 @@ if (album) {
 					{album!.items.map((item) => (
 						<div class="aspect-square overflow-hidden rounded-sm bg-stone-200">
 							<img
-								src={getItemImageUrl(adminBaseUrl, item.id)}
+								src={getItemImageUrl(adminBaseUrl, item.id, "thumb")}
 								alt=""
 								loading="lazy"
 								class="w-full h-full object-cover"

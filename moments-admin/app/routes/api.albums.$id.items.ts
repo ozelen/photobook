@@ -59,9 +59,13 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 		return Response.json({ error: "Album not found" }, { status: 404 });
 	}
 
-	let body: { imageId?: string; photoprismHash?: string };
+	let body: {
+		imageId?: string;
+		photoprismHash?: string;
+		photoprismExif?: Record<string, unknown>;
+	};
 	try {
-		body = (await request.json()) as { imageId?: string; photoprismHash?: string };
+		body = (await request.json()) as typeof body;
 	} catch {
 		return Response.json({ error: "Invalid JSON body" }, { status: 400 });
 	}
@@ -74,11 +78,13 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 		return Response.json({ error: "imageId or photoprismHash is required" }, { status: 400 });
 	}
 
+	const meta = body.photoprismExif ? { exif: body.photoprismExif } : undefined;
 	const result = await addItemToAlbum(
 		context.cloudflare.env.DB,
 		params.id,
 		user.id,
 		imageId,
+		{ meta },
 	);
 	if (!result) {
 		return Response.json({ error: "Failed to add item" }, { status: 500 });

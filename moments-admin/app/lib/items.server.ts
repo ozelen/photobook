@@ -92,6 +92,7 @@ export async function addItemToAlbum(
 	albumId: string,
 	ownerUserId: string,
 	imageId: string,
+	options?: { meta?: Record<string, unknown> },
 ): Promise<{ id: string } | null> {
 	const album = await db
 		.prepare("SELECT id FROM albums WHERE id = ? AND owner_user_id = ?")
@@ -111,14 +112,15 @@ export async function addItemToAlbum(
 	const outboxId = ulid();
 	const now = new Date().toISOString();
 	const payload = JSON.stringify({ id: itemId, imageId, albumId });
+	const metaJson = options?.meta ? JSON.stringify(options.meta) : null;
 
 	await db.batch([
 		db
 			.prepare(
-				`INSERT INTO items (id, owner_user_id, type, image_id, created_at, updated_at)
-         VALUES (?, ?, 'photo', ?, ?, ?)`,
+				`INSERT INTO items (id, owner_user_id, type, image_id, meta, created_at, updated_at)
+         VALUES (?, ?, 'photo', ?, ?, ?, ?)`,
 			)
-			.bind(itemId, ownerUserId, imageId, now, now),
+			.bind(itemId, ownerUserId, imageId, metaJson, now, now),
 		db
 			.prepare(
 				`INSERT INTO album_items (album_id, item_id, sort_order, created_at)

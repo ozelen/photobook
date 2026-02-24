@@ -29,6 +29,20 @@ export interface PhotoPrismPhoto {
 	taken_at: string;
 	width: number;
 	height: number;
+	exif?: {
+		cameraMake?: string;
+		cameraModel?: string;
+		lensModel?: string;
+		iso?: number;
+		focalLength?: number;
+		fNumber?: number;
+		exposure?: string;
+		takenAt?: string;
+		width?: number;
+		height?: number;
+		lat?: number;
+		lng?: number;
+	};
 }
 
 async function getSession(
@@ -115,6 +129,19 @@ export async function fetchPhotoPrismPhotos(
 		const files = (p.Files as Record<string, unknown>[] | undefined) ?? [];
 		const primary = files.find((f) => f.Primary) ?? files[0];
 		const hash = (primary?.Hash ?? p.Hash ?? "") as string;
+		const exif: PhotoPrismPhoto["exif"] = {};
+		if (p.CameraMake) exif.cameraMake = String(p.CameraMake);
+		if (p.CameraModel) exif.cameraModel = String(p.CameraModel);
+		if (p.LensModel) exif.lensModel = String(p.LensModel);
+		if (typeof p.Iso === "number") exif.iso = p.Iso;
+		if (typeof p.FocalLength === "number") exif.focalLength = p.FocalLength;
+		if (typeof p.FNumber === "number") exif.fNumber = p.FNumber;
+		if (p.Exposure) exif.exposure = String(p.Exposure);
+		if (p.TakenAt) exif.takenAt = String(p.TakenAt);
+		if (typeof p.Width === "number") exif.width = p.Width;
+		if (typeof p.Height === "number") exif.height = p.Height;
+		if (typeof p.Lat === "number") exif.lat = p.Lat;
+		if (typeof p.Lng === "number") exif.lng = p.Lng;
 		return {
 			uid: p.UID as string,
 			hash,
@@ -122,6 +149,7 @@ export async function fetchPhotoPrismPhotos(
 			taken_at: (p.TakenAt as string) || "",
 			width: (p.Width as number) ?? 0,
 			height: (p.Height as number) ?? 0,
+			exif: Object.keys(exif).length > 0 ? exif : undefined,
 		};
 	});
 	return { photos, previewToken, hasMore };

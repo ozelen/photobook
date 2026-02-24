@@ -19,6 +19,7 @@ interface PhotoPrismPhoto {
 	hash: string;
 	title: string;
 	taken_at: string;
+	exif?: Record<string, unknown>;
 }
 
 export function meta({ params, loaderData }: Route.MetaArgs) {
@@ -334,10 +335,15 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 		setPpError(null);
 		let added = 0;
 		for (const hash of ppSelectedHashes) {
+			const photo = ppPhotos.find((p) => p.hash === hash);
+			const body: { photoprismHash: string; photoprismExif?: Record<string, unknown> } = {
+				photoprismHash: hash,
+			};
+			if (photo?.exif) body.photoprismExif = photo.exif;
 			const res = await fetch(`/api/albums/${album.id}/items`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ photoprismHash: hash }),
+				body: JSON.stringify(body),
 			});
 			if (res.ok) added++;
 		}

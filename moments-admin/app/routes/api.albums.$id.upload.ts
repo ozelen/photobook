@@ -5,6 +5,7 @@ import { getAlbum } from "../lib/albums.server";
 import { addItemToAlbum } from "../lib/items.server";
 import { uploadToWebDAV } from "../lib/webdav.server";
 import { enqueueCfImagesUpload } from "../lib/enqueue-cf-images.server";
+import { extractExif } from "../lib/exif.server";
 
 const JPEG_EXTENSIONS = [".jpg", ".jpeg"];
 function isJpeg(filename: string): boolean {
@@ -60,6 +61,9 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 	const storagePath = `${params.id}/${ulid()}.jpg`;
 	const bytes = await file.arrayBuffer();
 
+	const exif = await extractExif(bytes);
+	const meta = exif ? { exif } : undefined;
+
 	try {
 		await uploadToWebDAV(
 			WEBDAV_BASE_URL,
@@ -79,6 +83,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 		params.id,
 		user.id,
 		storagePath,
+		{ meta },
 	);
 	if (!result) {
 		return Response.json({ error: "Failed to save photo" }, { status: 500 });
