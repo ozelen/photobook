@@ -5,18 +5,36 @@ import {
 	getPhotoPrismThumbnailUrl,
 	fetchPhotoPrismPhotos,
 } from "./photoprism.server";
+import { isCfImageRef, fromCfImageRef } from "./cf-images.server";
 
 export interface FetchImageEnv {
 	WEBDAV_BASE_URL?: string;
 	WEBDAV_USERNAME?: string;
 	WEBDAV_PASSWORD?: string;
 	PHOTOPRISM_BASE_URL?: string;
+	CF_IMAGES_DELIVERY_HASH?: string;
 }
 
 export async function fetchItemImage(
 	imageId: string,
 	env: FetchImageEnv,
 ): Promise<Response> {
+	if (isCfImageRef(imageId)) {
+		const cfId = fromCfImageRef(imageId);
+		const hash = env.CF_IMAGES_DELIVERY_HASH;
+		if (!cfId || !hash) return new Response("Not found", { status: 404 });
+		const url = `https://imagedelivery.net/${hash}/${cfId}/public`;
+		const res = await fetch(url, { headers: { Accept: "image/*" } });
+		if (!res.ok) return new Response("Failed to fetch image", { status: 502 });
+		const contentType = res.headers.get("Content-Type") || "image/jpeg";
+		return new Response(res.body, {
+			headers: {
+				"Content-Type": contentType,
+				"Cache-Control": "public, max-age=86400",
+			},
+		});
+	}
+
 	if (isPhotoPrismRef(imageId)) {
 		const hash = fromPhotoPrismRef(imageId);
 		if (!hash) return new Response("Not found", { status: 404 });
@@ -35,7 +53,7 @@ export async function fetchItemImage(
 				PHOTOPRISM_BASE_URL,
 				hash,
 				previewToken,
-				"tile_500",
+				"tile_224",
 			);
 			let thumbRes = await fetch(thumbUrl, { headers: { Accept: "image/*" } });
 			if (!thumbRes.ok) {

@@ -4,6 +4,7 @@ import { getSessionUser } from "../lib/auth.server";
 import { getAlbum } from "../lib/albums.server";
 import { addItemToAlbum } from "../lib/items.server";
 import { uploadToWebDAV } from "../lib/webdav.server";
+import { enqueueCfImagesUpload } from "../lib/enqueue-cf-images.server";
 
 const JPEG_EXTENSIONS = [".jpg", ".jpeg"];
 function isJpeg(filename: string): boolean {
@@ -30,12 +31,12 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 		return Response.json({ error: "Album not found" }, { status: 404 });
 	}
 
-	const env = context.cloudflare.env as {
+	const cloudflareEnv = context.cloudflare.env as {
 		WEBDAV_BASE_URL?: string;
 		WEBDAV_USERNAME?: string;
 		WEBDAV_PASSWORD?: string;
 	};
-	const { WEBDAV_BASE_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD } = env;
+	const { WEBDAV_BASE_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD } = cloudflareEnv;
 	if (!WEBDAV_BASE_URL || !WEBDAV_USERNAME || !WEBDAV_PASSWORD) {
 		return Response.json(
 			{ error: "WebDAV not configured" },
@@ -82,6 +83,14 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 	if (!result) {
 		return Response.json({ error: "Failed to save photo" }, { status: 500 });
 	}
+
+	context.cloudflare.ctx.waitUntil(
+		enqueueCfImagesUpload(
+			cloudflareEnv as Parameters<typeof enqueueCfImagesUpload>[0],
+			result.id,
+			storagePath,
+		),
+	);
 
 	return Response.json({ id: result.id });
 }

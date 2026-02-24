@@ -154,7 +154,7 @@ export function getPhotoPrismThumbnailUrl(
 	baseUrl: string,
 	hash: string,
 	previewToken: string,
-	size = "tile_500",
+	size = "tile_224",
 ): string {
 	return `${baseUrl.replace(/\/$/, "")}/api/v1/t/${hash}/${previewToken}/${size}`;
 }

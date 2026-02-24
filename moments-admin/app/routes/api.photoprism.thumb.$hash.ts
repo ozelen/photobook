@@ -36,7 +36,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 			PHOTOPRISM_BASE_URL,
 			hash,
 			previewToken,
-			"tile_500",
+			"tile_224",
 		);
 		let thumbRes = await fetch(thumbUrl, { headers: { Accept: "image/*" } });
 		if (!thumbRes.ok) {

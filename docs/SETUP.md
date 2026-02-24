@@ -69,6 +69,16 @@ Images from **public albums** are served via Cloudflare's edge (transform, cache
 
 Public album thumbnails then use `/cdn-cgi/image/` URLs; private albums still use the auth proxy. The image proxy uses the Worker Cache API (`caches.default`) to cache responses at the edge, reducing NAS fetches and improving response time.
 
+### Cloudflare Images (optional – copy selected originals to CF)
+
+When configured, selected photos (from PhotoPrism or WebDAV upload) are queued and copied to Cloudflare Images in the background. Once copied, they are served from `imagedelivery.net` (no proxy, fastest).
+
+1. Enable [Cloudflare Images](https://dash.cloudflare.com/?to=/:account/images) and note your **Account ID** and **Delivery URL hash** (from variant URLs).
+2. Create an API token with **Account → Cloudflare Images → Edit**.
+3. Set `moments-admin/wrangler.json` vars: `CF_IMAGES_ACCOUNT_ID`, `CF_IMAGES_DELIVERY_HASH`.
+4. Add secret: `wrangler secret put CF_IMAGES_API_TOKEN` (from `moments-admin`).
+5. The queue `cf-images-upload` is created automatically. Background jobs fetch from NAS (PhotoPrism `fit_1920` or WebDAV) and upload via CF Images API.
+
 ### PhotoPrism integration
 
 To import photos from PhotoPrism (e.g. on your NAS):

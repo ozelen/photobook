@@ -3,7 +3,9 @@
   "name": "moments-admin",
   "main": "./workers/app.ts",
   "compatibility_date": "2025-10-08",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -13,10 +15,36 @@
     }
   ],
   "r2_buckets": [
-    { "binding": "R2_MEDIA", "bucket_name": "moments-media" }
+    {
+      "binding": "R2_MEDIA",
+      "bucket_name": "moments-media"
+    }
   ],
-  "observability": { "enabled": true },
+  "queues": {
+    "producers": [
+      {
+        "queue": "cf-images-upload",
+        "binding": "CF_IMAGES_QUEUE"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "cf-images-upload",
+        "max_batch_size": 1,
+        "max_retries": 5
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true
+  },
   "upload_source_maps": true,
-  "vars": { "VALUE_FROM_CLOUDFLARE": "Moments Admin", "SESSION_SECRET": "dev-secret-change-in-production", "CF_IMAGES_ACCOUNT_ID": "", "CF_IMAGES_DELIVERY_HASH": "", "WEBDAV_BASE_URL": "https://photo.zelen.uk/originals",
-    "PHOTOPRISM_BASE_URL": "https://photo.zelen.uk" }
+  "vars": {
+    "VALUE_FROM_CLOUDFLARE": "Moments Admin",
+    "SESSION_SECRET": "dev-secret-change-in-production",
+    "CF_IMAGES_ACCOUNT_ID": "",
+    "CF_IMAGES_DELIVERY_HASH": "",
+    "WEBDAV_BASE_URL": "https://photo.zelen.uk/originals",
+    "PHOTOPRISM_BASE_URL": "https://photo.zelen.uk"
+  }
 }

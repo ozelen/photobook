@@ -3,6 +3,7 @@ import { getSessionUser } from "../lib/auth.server";
 import { getAlbum } from "../lib/albums.server";
 import { addItemToAlbum } from "../lib/items.server";
 import { toPhotoPrismRef } from "../lib/photoprism.server";
+import { enqueueCfImagesUpload } from "../lib/enqueue-cf-images.server";
 
 export async function loader() {
 	return new Response(JSON.stringify({ error: "Method not allowed" }), {
@@ -47,6 +48,11 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 	if (!result) {
 		return Response.json({ error: "Failed to add item" }, { status: 500 });
 	}
+
+	const env = context.cloudflare.env as Parameters<typeof enqueueCfImagesUpload>[0];
+	context.cloudflare.ctx.waitUntil(
+		enqueueCfImagesUpload(env, result.id, imageId),
+	);
 
 	return Response.json({ id: result.id });
 }

@@ -1,10 +1,10 @@
 import { Form, Link, redirect, useRevalidator } from "react-router";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import type { Route } from "./+types/albums.$id";
 import { getSessionUser } from "../lib/auth.server";
 import { getAlbum, deleteAlbum } from "../lib/albums.server";
 import { listAlbumItems } from "../lib/items.server";
-import { getCfImageUrl } from "../lib/images.server";
+import { getCfImageUrl, getCfImagesDeliveryUrl } from "../lib/images.server";
 
 interface PhotoPrismAlbum {
 	uid: string;
@@ -42,17 +42,22 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 	const rawItems = await listAlbumItems(context.cloudflare.env.DB, params.id, user.id);
 	const origin = new URL(request.url).origin;
 	const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
+	const cfDeliveryHash = (context.cloudflare.env as { CF_IMAGES_DELIVERY_HASH?: string })
+		.CF_IMAGES_DELIVERY_HASH;
 	const items = rawItems.map((item) => {
+		const directCf = cfDeliveryHash && getCfImagesDeliveryUrl(item.imageId, cfDeliveryHash, "thumb");
 		const thumbUrl =
-			album.isPublic === 1
-				? isLocal
-					? `/api/public/items/${item.id}/image`
-					: getCfImageUrl(
-							origin,
-							`${origin}/api/public/items/${item.id}/image`,
-							"thumb",
-						)
-				: `/api/items/${item.id}/image`;
+			directCf
+				? directCf
+				: album.isPublic === 1
+					? isLocal
+						? `/api/public/items/${item.id}/image`
+						: getCfImageUrl(
+								origin,
+								`${origin}/api/public/items/${item.id}/image`,
+								"thumb",
+							)
+					: `/api/items/${item.id}/image`;
 		return { ...item, thumbUrl };
 	});
 
@@ -84,9 +89,15 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 	const [ppSelectedAlbum, setPpSelectedAlbum] = useState<string | null>(null);
 	const [ppSelectedHashes, setPpSelectedHashes] = useState<Set<string>>(new Set());
 	const [ppLoading, setPpLoading] = useState(false);
+	const [ppLoadingMore, setPpLoadingMore] = useState(false);
+	const [ppHasMore, setPpHasMore] = useState(false);
+	const [ppOffset, setPpOffset] = useState(0);
 	const [ppError, setPpError] = useState<string | null>(null);
 	const [ppAdding, setPpAdding] = useState(false);
+	const ppScrollRef = useRef<HTMLDivElement>(null);
 	const revalidator = useRevalidator();
+
+	const PP_PAGE_SIZE = 48;
 
 	useEffect(() => {
 		if (!photoprismOpen) return;
@@ -104,21 +115,70 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 	useEffect(() => {
 		if (!photoprismOpen || !ppSelectedAlbum) {
 			setPpPhotos([]);
+			setPpHasMore(false);
+			setPpOffset(0);
 			return;
 		}
 		setPpLoading(true);
 		setPpError(null);
-		fetch(`/api/photoprism/photos/all?album=${ppSelectedAlbum}`)
+		setPpOffset(0);
+		fetch(
+			`/api/photoprism/photos?album=${ppSelectedAlbum}&offset=0&count=${PP_PAGE_SIZE}`,
+		)
 			.then((r) => r.json())
 			.then((d: unknown) => {
-				const data = d as { photos?: PhotoPrismPhoto[]; error?: string };
+				const data = d as {
+					photos?: PhotoPrismPhoto[];
+					hasMore?: boolean;
+					error?: string;
+				};
 				if (data.error) throw new Error(data.error);
 				setPpPhotos(data.photos ?? []);
+				setPpHasMore(data.hasMore ?? false);
 				setPpSelectedHashes(new Set());
 			})
 			.catch((e) => setPpError(e instanceof Error ? e.message : "Failed to load photos"))
 			.finally(() => setPpLoading(false));
 	}, [photoprismOpen, ppSelectedAlbum]);
+
+	const loadMorePhotos = useCallback(async () => {
+		if (!ppSelectedAlbum || ppLoadingMore || !ppHasMore) return;
+		setPpLoadingMore(true);
+		setPpError(null);
+		const nextOffset = ppPhotos.length;
+		try {
+			const res = await fetch(
+				`/api/photoprism/photos?album=${ppSelectedAlbum}&offset=${nextOffset}&count=${PP_PAGE_SIZE}`,
+			);
+			const data = (await res.json()) as {
+				photos?: PhotoPrismPhoto[];
+				hasMore?: boolean;
+				error?: string;
+			};
+			if (data.error) throw new Error(data.error);
+			setPpPhotos((prev) => [...prev, ...(data.photos ?? [])]);
+			setPpHasMore(data.hasMore ?? false);
+		} catch (e) {
+			setPpError(e instanceof Error ? e.message : "Failed to load more");
+		} finally {
+			setPpLoadingMore(false);
+		}
+	}, [ppSelectedAlbum, ppLoadingMore, ppHasMore, ppPhotos.length]);
+
+	useEffect(() => {
+		if (!ppHasMore || ppLoadingMore || !ppSelectedAlbum) return;
+		const el = ppScrollRef.current;
+		if (!el) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting) loadMorePhotos();
+			},
+			{ root: el, rootMargin: "200px", threshold: 0 },
+		);
+		const sentinel = el.querySelector("[data-pp-load-more]");
+		if (sentinel) observer.observe(sentinel);
+		return () => observer.disconnect();
+	}, [ppHasMore, ppLoadingMore, ppSelectedAlbum, loadMorePhotos]);
 
 	async function addSelectedFromPhotoPrism() {
 		if (ppSelectedHashes.size === 0) return;
@@ -289,37 +349,58 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 								{ppError}
 							</p>
 						)}
-						<div className="flex-1 overflow-auto p-4">
+						<div
+							ref={ppScrollRef}
+							className="flex-1 overflow-auto p-4"
+						>
 							{ppLoading ? (
 								<p className="text-gray-500">Loading photos…</p>
 							) : ppPhotos.length > 0 ? (
-								<div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-									{ppPhotos.map((p) => (
-										<button
-											key={p.hash}
-											type="button"
-											onClick={() => {
-												setPpSelectedHashes((prev) => {
-													const next = new Set(prev);
-													if (next.has(p.hash)) next.delete(p.hash);
-													else next.add(p.hash);
-													return next;
-												});
-											}}
-											className={`aspect-square rounded-lg overflow-hidden border-2 border-transparent ${
-												ppSelectedHashes.has(p.hash)
-													? "border-blue-500 ring-2 ring-blue-500/50"
-													: "hover:border-gray-400"
-											}`}
+								<>
+									<div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+										{ppPhotos.map((p) => (
+											<button
+												key={p.hash}
+												type="button"
+												onClick={() => {
+													setPpSelectedHashes((prev) => {
+														const next = new Set(prev);
+														if (next.has(p.hash)) next.delete(p.hash);
+														else next.add(p.hash);
+														return next;
+													});
+												}}
+												className={`aspect-square rounded-lg overflow-hidden border-2 border-transparent ${
+													ppSelectedHashes.has(p.hash)
+														? "border-blue-500 ring-2 ring-blue-500/50"
+														: "hover:border-gray-400"
+												}`}
+											>
+												<img
+													src={`/api/photoprism/thumb/${p.hash}`}
+													alt=""
+													loading="lazy"
+													className="w-full h-full object-cover"
+												/>
+											</button>
+										))}
+									</div>
+									{ppHasMore && (
+										<div
+											data-pp-load-more
+											className="flex justify-center py-4"
 										>
-											<img
-												src={`/api/photoprism/thumb/${p.hash}`}
-												alt=""
-												className="w-full h-full object-cover"
-											/>
-										</button>
-									))}
-								</div>
+											<button
+												type="button"
+												onClick={loadMorePhotos}
+												disabled={ppLoadingMore}
+												className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
+											>
+												{ppLoadingMore ? "Loading…" : "Load more"}
+											</button>
+										</div>
+									)}
+								</>
 							) : ppSelectedAlbum ? (
 								<p className="text-gray-500">No photos in this album.</p>
 							) : null}
@@ -349,6 +430,7 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 								<img
 									src={item.thumbUrl}
 									alt=""
+									loading="lazy"
 									className="w-full h-full object-cover"
 								/>
 							) : (
