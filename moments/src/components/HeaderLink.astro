@@ -5,8 +5,7 @@ type Props = HTMLAttributes<"a"> & { href: string };
 
 const { href, class: className, ...props } = Astro.props;
 const pathname = Astro.url.pathname.replace(import.meta.env.BASE_URL, "");
-const hash = Astro.url.hash;
-const isActive = href === pathname || (href.startsWith("#") && href === hash) || (pathname === "/" && href === "/#gallery" && !hash);
+const isActive = href === pathname || (href === "/" && (pathname === "/" || pathname === ""));
 ---
 
 <a

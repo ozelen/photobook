@@ -1,6 +1,19 @@
 ---
 import HeaderLink from "./HeaderLink.astro";
 import { SITE_TITLE } from "../consts";
+
+interface Props {
+	horizontalScroll?: boolean;
+	currentPath?: string;
+}
+
+const { horizontalScroll = false, currentPath } = Astro.props;
+const path = currentPath ?? Astro.url.pathname;
+
+function isActive(path: string, current: string): boolean {
+	if (path === "/") return current === "/" || current === "";
+	return current.startsWith(path) && (path === current || current[path.length] === "/");
+}
 ---
 
 <header class="fixed top-0 left-0 right-0 z-50 bg-stone-50/95 backdrop-blur-sm border-b border-stone-200/80">
@@ -9,10 +22,49 @@ import { SITE_TITLE } from "../consts";
 			{SITE_TITLE}
 		</a>
 		<div class="flex items-center gap-8">
-			<HeaderLink href="/#gallery">Gallery</HeaderLink>
-			<HeaderLink href="/#services">Services</HeaderLink>
-			<HeaderLink href="/about">About</HeaderLink>
-			<HeaderLink href="/#contact">Contact</HeaderLink>
+			{horizontalScroll ? (
+				<>
+					<a
+						href="/"
+						class:list={["nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline", { "nav-active text-stone-900 font-semibold": isActive("/", path) }]}
+						aria-current={isActive("/", path) ? "page" : undefined}
+					>
+						Home
+					</a>
+					<a
+						href="/gallery"
+						class:list={["nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline", { "nav-active text-stone-900 font-semibold": isActive("/gallery", path) }]}
+						aria-current={isActive("/gallery", path) ? "page" : undefined}
+					>
+						Gallery
+					</a>
+					<a
+						href="/services"
+						class:list={["nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline", { "nav-active text-stone-900 font-semibold": isActive("/services", path) }]}
+						aria-current={isActive("/services", path) ? "page" : undefined}
+					>
+						Services
+					</a>
+					<a
+						href="/contact"
+						class:list={["nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline", { "nav-active text-stone-900 font-semibold": isActive("/contact", path) }]}
+						aria-current={isActive("/contact", path) ? "page" : undefined}
+					>
+						Contact
+					</a>
+					<HeaderLink href="/about">About</HeaderLink>
+				</>
+			) : (
+				<>
+					<HeaderLink href="/">Home</HeaderLink>
+					<HeaderLink href="/gallery">Gallery</HeaderLink>
+					<HeaderLink href="/services">Services</HeaderLink>
+					<HeaderLink href="/about" class:list={[{ "text-stone-900 font-semibold": isActive("/about", path) }]}>
+						About
+					</HeaderLink>
+					<HeaderLink href="/contact">Contact</HeaderLink>
+				</>
+			)}
 			<HeaderLink href="/blog">Blog</HeaderLink>
 		</div>
 	</nav>

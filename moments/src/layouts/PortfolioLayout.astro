@@ -6,9 +6,11 @@ import Footer from "../components/Footer.astro";
 interface Props {
 	title: string;
 	description: string;
+	horizontalScroll?: boolean;
+	currentPath?: string;
 }
 
-const { title, description } = Astro.props;
+const { title, description, horizontalScroll = false, currentPath } = Astro.props;
 ---
 
 <!doctype html>
@@ -22,11 +24,11 @@ const { title, description } = Astro.props;
 			rel="stylesheet"
 		/>
 	</head>
-	<body class="bg-stone-50 text-stone-900 antialiased">
-		<Header />
-		<main>
+	<body class="bg-stone-50 text-stone-900 antialiased overflow-x-hidden">
+		<Header horizontalScroll={horizontalScroll} currentPath={currentPath} />
+		<main class:list={{ "relative h-[calc(100vh-65px)] mt-[65px] overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory flex [scrollbar-gutter:stable] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:bg-stone-300 [&::-webkit-scrollbar-thumb]:rounded-full": horizontalScroll }}>
 			<slot />
 		</main>
-		<Footer />
+		{!horizontalScroll && <Footer />}
 	</body>
 </html>

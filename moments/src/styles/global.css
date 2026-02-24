@@ -101,6 +101,11 @@ hr {
 	}
 }
 
+.nav-active {
+	color: #1c1917;
+	font-weight: 600;
+}
+
 .sr-only {
 	border: 0;
 	padding: 0;

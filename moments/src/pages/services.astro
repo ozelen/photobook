@@ -18,6 +18,6 @@ const galleryItems = albums.flatMap((a) =>
 );
 ---
 
-<PortfolioLayout title={SITE_TITLE} description={SITE_DESCRIPTION} horizontalScroll={true} currentPath="/">
-	<HomeSections albums={albums} galleryItems={galleryItems} adminBaseUrl={adminBaseUrl} />
+<PortfolioLayout title={SITE_TITLE} description={SITE_DESCRIPTION} horizontalScroll={true} currentPath="/services">
+	<HomeSections albums={albums} galleryItems={galleryItems} adminBaseUrl={adminBaseUrl} initialSection="services" />
 </PortfolioLayout>
