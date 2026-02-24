@@ -27,26 +27,28 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			</>
 		)}
 	</div>
-	<div id="hero-content" class:list={["max-w-4xl mx-auto text-center relative z-10", heroImageUrl && "text-white"]}>
-		<h1 id="hero-title" class:list={["font-serif text-5xl sm:text-6xl lg:text-7xl font-light leading-tight tracking-tight", heroImageUrl ? "text-white" : "text-stone-900"]}>
-			Capturing Moments<br />
-			<span class:list={["italic", heroImageUrl ? "text-white/90" : "text-stone-600"]}>That Last Forever</span>
-		</h1>
-		<p id="hero-subtitle" class:list={["mt-8 text-lg sm:text-xl max-w-2xl mx-auto font-sans", heroImageUrl ? "text-white/90" : "text-stone-600"]}>
-			Award-winning photography specializing in portrait, landscape, and event photography that tells your unique story.
-		</p>
-		<div id="hero-ctas" class="mt-12 flex flex-wrap justify-center gap-4">
+	<div id="hero-content" class:list={["max-w-4xl mx-auto text-center relative z-10 w-full", heroImageUrl && "text-white"]}>
+		<div id="hero-text-wrap" class="min-h-[7.5rem] flex flex-col justify-center">
+			<h1 id="hero-title" class:list={["font-serif text-5xl sm:text-6xl lg:text-7xl font-light leading-tight tracking-tight min-h-[3.5rem] sm:min-h-[4rem] lg:min-h-[4.5rem] transition-opacity duration-300", heroImageUrl ? "text-white" : "text-stone-900"]}>
+				Capturing Moments<br />
+				<span class:list={["italic", heroImageUrl ? "text-white/90" : "text-stone-600"]}>That Last Forever</span>
+			</h1>
+			<p id="hero-subtitle" class:list={["mt-8 text-lg sm:text-xl max-w-2xl mx-auto font-sans min-h-[4.5rem] transition-opacity duration-300", heroImageUrl ? "text-white/90" : "text-stone-600"]}>
+				Award-winning photography specializing in portrait, landscape, and event photography that tells your unique story.
+			</p>
+		</div>
+		<div id="hero-ctas" class="mt-12 flex flex-wrap justify-center gap-4 min-h-[3rem]">
 			<a
 				href="/gallery"
 				data-hero-cta="gallery"
-				class="scroll-to-btn hero-cta-link inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors no-underline"
+				class="scroll-to-btn hero-cta-link inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-all duration-300 no-underline border border-stone-900"
 			>
 				Our Gallery
 			</a>
 			<a
 				href="/contact"
 				class:list={[
-					"scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline",
+					"scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline",
 					heroImageUrl ? "border border-white/80 text-white hover:bg-white/10" : "border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100",
 				]}
 			>
@@ -230,8 +232,12 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 <script define:vars={{ initialSection, initialTag }}>
 	const SECTIONS = ['hero', 'gallery', 'services', 'contact', 'about'];
 	const SECTION_LABELS = { hero: 'Home', gallery: 'Gallery', services: 'Services', contact: 'Contact', about: 'About' };
+	const HERO_CAROUSEL_INTERVAL_MS = 5000;
 	let skipScrollSync = false;
 	let currentHeroTag = '';
+	let heroSlides = [];
+	let carouselIntervalId = null;
+	let heroSectionInView = false;
 	if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
 	function pathToSection(path) {
@@ -391,13 +397,111 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			loadGallery(tag);
 		});
 
+		function applyHeroSlide(slide) {
+			if (!slide) return;
+			const { heroTitle, heroSubtitle, heroImageUrl, heroImageAlt } = slide;
+			const wrap = document.getElementById('hero-image-wrap');
+			const heroContent = document.getElementById('hero-content');
+			const heroTitleEl = document.getElementById('hero-title');
+			const heroSubtitleEl = document.getElementById('hero-subtitle');
+			const heroTextWrap = document.getElementById('hero-text-wrap');
+			if (heroTextWrap) heroTextWrap.style.opacity = '0';
+			setTimeout(() => {
+				if (heroTitleEl && heroTitle) {
+					const parts = String(heroTitle).split(' | ');
+					heroTitleEl.innerHTML = parts.length > 1
+						? escapeHtml(parts[0]) + '<br /><span class="italic">' + escapeHtml(parts.slice(1).join(' | ')) + '</span>'
+						: escapeHtml(heroTitle);
+				}
+				if (heroSubtitleEl && heroSubtitle) heroSubtitleEl.textContent = heroSubtitle;
+				if (heroTextWrap) heroTextWrap.style.opacity = '1';
+			}, 150);
+			if (wrap) {
+				if (heroImageUrl) {
+					wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover hero-image-transition" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
+					if (heroContent) {
+						heroContent.classList.add('text-white');
+						heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');
+						heroContent.querySelector('h1 span')?.classList.replace('text-stone-600', 'text-white/90');
+						heroContent.querySelector('p')?.classList.replace('text-stone-600', 'text-white/90');
+					}
+				} else {
+					wrap.innerHTML = '';
+					if (heroContent) {
+						heroContent.classList.remove('text-white');
+						heroContent.querySelector('h1')?.classList.replace('text-white', 'text-stone-900');
+						heroContent.querySelector('h1 span')?.classList.replace('text-white/90', 'text-stone-600');
+						heroContent.querySelector('p')?.classList.replace('text-white/90', 'text-stone-600');
+					}
+				}
+			}
+			highlightHeroCta(slide.slug, !!slide.heroImageUrl);
+		}
+
+		function highlightHeroCta(activeSlug, hasHeroImage) {
+			const heroCtasEl = document.getElementById('hero-ctas');
+			if (!heroCtasEl) return;
+			const ctaBase = 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline';
+			const links = heroCtasEl.querySelectorAll('.hero-cta-link');
+			links.forEach((link) => {
+				const slug = link.getAttribute('data-tag-slug') ?? (link.getAttribute('data-hero-cta') === 'gallery' ? '' : null);
+				if (slug === null) return;
+				const isActive = slug === activeSlug;
+				if (hasHeroImage) {
+					link.className = isActive
+						? `${ctaBase} bg-stone-900 text-white border border-stone-900 hover:bg-stone-800`
+						: `${ctaBase} bg-transparent border border-white/80 text-white hover:bg-white/10`;
+				} else {
+					link.className = isActive
+						? `${ctaBase} bg-stone-900 text-white border border-stone-900 hover:bg-stone-800`
+						: `${ctaBase} bg-white border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100`;
+				}
+			});
+			const contactBtn = heroCtasEl.querySelector('a[href="/contact"]');
+			if (contactBtn) {
+				contactBtn.className = hasHeroImage
+					? 'scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline border border-white/80 text-white hover:bg-white/10'
+					: 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-all duration-300 no-underline';
+			}
+		}
+
+		function advanceCarousel() {
+			if (heroSlides.length === 0) return;
+			const currentIdx = heroSlides.findIndex((s) => s.slug === currentHeroTag);
+			const nextIdx = (currentIdx + 1) % heroSlides.length;
+			const nextSlide = heroSlides[nextIdx];
+			currentHeroTag = nextSlide.slug;
+			applyHeroSlide(nextSlide);
+		}
+
+		function startCarousel() {
+			if (carouselIntervalId || heroSlides.length <= 1) return;
+			carouselIntervalId = setInterval(advanceCarousel, HERO_CAROUSEL_INTERVAL_MS);
+		}
+
+		function stopCarousel() {
+			if (carouselIntervalId) {
+				clearInterval(carouselIntervalId);
+				carouselIntervalId = null;
+			}
+		}
+
 		const observer = new IntersectionObserver(
 			(entries) => {
 				entries.forEach((entry) => {
+					const isHero = entry.target.id === 'hero';
 					if (entry.isIntersecting) {
 						entry.target.classList.add('section-in-view');
+						if (isHero) {
+							heroSectionInView = true;
+							startCarousel();
+						}
 					} else {
 						entry.target.classList.remove('section-in-view');
+						if (isHero) {
+							heroSectionInView = false;
+							stopCarousel();
+						}
 					}
 				});
 			},
@@ -438,9 +542,21 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			if (emptyFilterEl) emptyFilterEl.classList.add('hidden');
 			fetch(url)
 				.then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load gallery'))))
-				.then((data) => {
+				.then(async (data) => {
 					const { galleryItems = [], topTags = [], heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt } = data;
 					if (loadingEl) loadingEl.classList.add('hidden');
+					const defaultData = tag ? await fetch('/api/gallery.json').then((r) => (r.ok ? r.json() : null)) : data;
+					const defaultSlide = defaultData ? { slug: '', name: 'Our Gallery', heroTitle: defaultData.heroTitle, heroSubtitle: defaultData.heroSubtitle, heroImageUrl: defaultData.heroImageUrl, heroImageAlt: defaultData.heroImageAlt } : null;
+					const tagSlides = await Promise.all(
+						topTags.map((t) =>
+							tag === t.slug
+								? Promise.resolve({ slug: t.slug, name: t.name, heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt })
+								: fetch(`/api/gallery.json?tag=${encodeURIComponent(t.slug)}`)
+										.then((r) => (r.ok ? r.json() : null))
+										.then((d) => d ? { slug: t.slug, name: t.name, heroTitle: d.heroTitle, heroSubtitle: d.heroSubtitle, heroImageUrl: d.heroImageUrl, heroImageAlt: d.heroImageAlt } : null)
+						)
+					);
+					heroSlides = [defaultSlide, ...tagSlides.filter(Boolean)].filter(Boolean);
 					const wrap = document.getElementById('hero-image-wrap');
 					const heroContent = document.getElementById('hero-content');
 					const heroTitleEl = document.getElementById('hero-title');
@@ -457,7 +573,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 					}
 					if (wrap) {
 						if (apiHeroUrl) {
-							wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(apiHeroUrl)}" alt="${escapeHtml(apiHeroAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
+							wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(apiHeroUrl)}" alt="${escapeHtml(apiHeroAlt || '')}" class="w-full h-full object-cover hero-image-transition" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
 							if (heroContent) {
 								heroContent.classList.add('text-white');
 								heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');
@@ -481,18 +597,19 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 					if (heroCtasEl) {
 						const isGalleryPrimary = !tag;
 						const hasHeroImage = !!apiHeroUrl;
+						const ctaBase = 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline';
 						const galleryClasses = isGalleryPrimary
-							? 'hero-cta-link scroll-to-btn inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors no-underline'
-							: (hasHeroImage ? 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-white/80 text-white hover:bg-white/10' : 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100');
+							? `${ctaBase} scroll-to-btn bg-stone-900 text-white border border-stone-900 hover:bg-stone-800`
+							: (hasHeroImage ? `${ctaBase} bg-transparent border border-white/80 text-white hover:bg-white/10` : `${ctaBase} bg-white border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100`);
 						const tagCtaClasses = (t) => {
 							const active = tag === t.slug;
 							return active
-								? 'hero-cta-link inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors no-underline'
-								: (hasHeroImage ? 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-white/80 text-white hover:bg-white/10' : 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100');
+								? `${ctaBase} bg-stone-900 text-white border border-stone-900 hover:bg-stone-800`
+								: (hasHeroImage ? `${ctaBase} bg-transparent border border-white/80 text-white hover:bg-white/10` : `${ctaBase} bg-white border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100`);
 						};
 						const contactClasses = hasHeroImage
-							? 'scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-white/80 text-white hover:bg-white/10'
-							: 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-colors no-underline';
+							? 'scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline border border-white/80 text-white hover:bg-white/10'
+							: 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-all duration-300 no-underline';
 						const tagButtons = topTags.map((t) =>
 							`<a href="/gallery/${escapeHtml(t.slug)}" data-hero-cta="tag" data-tag-slug="${escapeHtml(t.slug)}" class="${tagCtaClasses(t)}">${escapeHtml(t.name)}</a>`
 						).join('');
@@ -536,6 +653,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 					}
 					if (emptyEl) emptyEl.classList.toggle('hidden', galleryItems.length > 0);
 					if (emptyFilterEl) emptyFilterEl.classList.toggle('hidden', galleryItems.length > 0 || !tag);
+					if (heroSectionInView && heroSlides.length > 1) startCarousel();
 				})
 				.catch(() => {
 					if (loadingEl) loadingEl.classList.add('hidden');

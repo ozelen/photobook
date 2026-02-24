@@ -114,6 +114,23 @@ hr {
 	animation: section-fade-in 0.5s ease-out forwards;
 }
 
+#hero-text-wrap {
+	transition: opacity 0.3s ease;
+}
+
+.hero-image-transition {
+	animation: hero-image-fade-in 0.5s ease-out forwards;
+}
+
+@keyframes hero-image-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
 @keyframes section-fade-in {
 	from {
 		opacity: 0.6;
