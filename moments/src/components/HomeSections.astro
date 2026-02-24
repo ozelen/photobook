@@ -196,8 +196,35 @@ const { albums, galleryItems, adminBaseUrl, initialSection } = Astro.props;
 	</footer>
 </section>
 
+<button
+	type="button"
+	id="prev-section-btn"
+	class="section-nav-btn fixed left-0 z-40 px-6 py-4 flex items-center gap-3 bg-stone-900/70 hover:bg-stone-900 text-white/90 hover:text-white transition-all duration-300 group border-r border-white/10"
+	style="top: 140px"
+	aria-label="Previous section"
+>
+	<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:-translate-x-0.5 transition-transform duration-200">
+		<path d="M19 12H5M12 19l-7-7 7-7" />
+	</svg>
+	<span class="text-xs uppercase tracking-[0.15em] font-medium" data-section-label>Home</span>
+</button>
+
+<button
+	type="button"
+	id="next-section-btn"
+	class="section-nav-btn fixed right-0 z-40 px-6 py-4 flex items-center gap-3 bg-stone-900/70 hover:bg-stone-900 text-white/90 hover:text-white transition-all duration-300 group border-l border-white/10"
+	style="top: 140px"
+	aria-label="Next section"
+>
+	<span class="text-xs uppercase tracking-[0.15em] font-medium" data-section-label>Gallery</span>
+	<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:translate-x-0.5 transition-transform duration-200">
+		<path d="M5 12h14M12 5l7 7-7 7" />
+	</svg>
+</button>
+
 <script define:vars={{ initialSection }}>
 	const SECTIONS = ['hero', 'gallery', 'services', 'contact', 'about'];
+	const SECTION_LABELS = { hero: 'Home', gallery: 'Gallery', services: 'Services', contact: 'Contact', about: 'About' };
 	let skipScrollSync = false;
 	if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
@@ -235,6 +262,23 @@ const { albums, galleryItems, adminBaseUrl, initialSection } = Astro.props;
 			a.classList.toggle('nav-active', linkSection === section);
 			a.setAttribute('aria-current', linkSection === section ? 'page' : null);
 		});
+		const idx = SECTIONS.indexOf(section);
+		const prevBtn = document.getElementById('prev-section-btn');
+		const nextBtn = document.getElementById('next-section-btn');
+		if (prevBtn) {
+			prevBtn.classList.toggle('opacity-0', idx <= 0);
+			prevBtn.classList.toggle('pointer-events-none', idx <= 0);
+			prevBtn.classList.toggle('-translate-x-2', idx <= 0);
+			const prevLabel = prevBtn.querySelector('[data-section-label]');
+			if (prevLabel && idx > 0) prevLabel.textContent = SECTION_LABELS[SECTIONS[idx - 1]];
+		}
+		if (nextBtn) {
+			nextBtn.classList.toggle('opacity-0', idx >= SECTIONS.length - 1);
+			nextBtn.classList.toggle('pointer-events-none', idx >= SECTIONS.length - 1);
+			nextBtn.classList.toggle('translate-x-2', idx >= SECTIONS.length - 1);
+			const nextLabel = nextBtn.querySelector('[data-section-label]');
+			if (nextLabel && idx < SECTIONS.length - 1) nextLabel.textContent = SECTION_LABELS[SECTIONS[idx + 1]];
+		}
 	}
 
 	function syncFromScroll() {
@@ -286,6 +330,39 @@ const { albums, galleryItems, adminBaseUrl, initialSection } = Astro.props;
 		window.addEventListener('popstate', (e) => {
 			const section = e.state?.section ?? pathToSection(location.pathname);
 			if (SECTIONS.includes(section)) scrollToSection(section);
+		});
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						entry.target.classList.add('section-in-view');
+					} else {
+						entry.target.classList.remove('section-in-view');
+					}
+				});
+			},
+			{ threshold: 0.2 }
+		);
+		SECTIONS.forEach((id) => {
+			const el = document.getElementById(id);
+			if (el) observer.observe(el);
+		});
+
+		document.getElementById('prev-section-btn')?.addEventListener('click', () => {
+			const scroll = document.querySelector('main');
+			if (!scroll) return;
+			const section = getSectionFromScroll(scroll);
+			const idx = SECTIONS.indexOf(section);
+			if (idx > 0) scrollToSection(SECTIONS[idx - 1]);
+		});
+
+		document.getElementById('next-section-btn')?.addEventListener('click', () => {
+			const scroll = document.querySelector('main');
+			if (!scroll) return;
+			const section = getSectionFromScroll(scroll);
+			const idx = SECTIONS.indexOf(section);
+			if (idx < SECTIONS.length - 1) scrollToSection(SECTIONS[idx + 1]);
 		});
 	});
 </script>
