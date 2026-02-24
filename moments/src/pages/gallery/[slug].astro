@@ -1,0 +1,43 @@
+---
+import PortfolioLayout from "../../layouts/PortfolioLayout.astro";
+import { getPublicAlbums, getItemImageUrl } from "../../lib/public-albums";
+
+const { slug } = Astro.params;
+if (!slug) return Astro.redirect("/");
+
+const runtime = Astro.locals.runtime;
+const db = runtime.env.DB;
+const adminBaseUrl = (runtime.env as { ADMIN_BASE_URL?: string }).ADMIN_BASE_URL ?? "https://adm-moments.zelen.uk";
+
+const albums = await getPublicAlbums(db);
+const album = albums.find((a) => a.slug === slug);
+if (!album) return Astro.redirect("/");
+---
+
+<PortfolioLayout title={`${album.name} — Gallery`} description={album.description ?? album.name}>
+	<section class="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
+		<div class="max-w-7xl mx-auto">
+			<div class="mb-12">
+				<a href="/#gallery" class="text-stone-600 hover:text-stone-900 text-sm font-medium mb-4 inline-block">
+					← Back to Gallery
+				</a>
+				<h1 class="font-serif text-4xl sm:text-5xl font-light text-stone-900 mt-2">{album.name}</h1>
+				{album.description && (
+					<p class="mt-4 text-stone-600 max-w-2xl">{album.description}</p>
+				)}
+			</div>
+			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+				{album.items.map((item) => (
+					<div class="aspect-square overflow-hidden rounded-sm bg-stone-200">
+						<img
+							src={getItemImageUrl(adminBaseUrl, item.id)}
+							alt=""
+							loading="lazy"
+							class="w-full h-full object-cover"
+						/>
+					</div>
+				))}
+			</div>
+		</div>
+	</section>
+</PortfolioLayout>

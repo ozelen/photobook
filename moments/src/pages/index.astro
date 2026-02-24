@@ -1,50 +1,173 @@
 ---
-import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import PortfolioLayout from "../layouts/PortfolioLayout.astro";
+import { SITE_TITLE, SITE_DESCRIPTION } from "../consts";
+import { getPublicAlbums, getItemImageUrl } from "../lib/public-albums";
+
+const runtime = Astro.locals.runtime;
+const db = runtime.env.DB;
+const adminBaseUrl = (runtime.env as { ADMIN_BASE_URL?: string }).ADMIN_BASE_URL ?? "https://adm-moments.zelen.uk";
+
+const albums = await getPublicAlbums(db);
+const galleryItems = albums.flatMap((a) =>
+	a.items.slice(0, 12).map((item) => ({
+		...item,
+		albumName: a.name,
+		thumbUrl: getItemImageUrl(adminBaseUrl, item.id),
+	})),
+);
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-	</head>
-	<body>
-		<Header />
-		<main>
-			<h1>🧑‍🚀 Hello, Astronaut!</h1>
-			<p>
-				Welcome to the official <a href="https://astro.build/">Astro</a> blog starter template. This
-				template serves as a lightweight, minimally-styled starting point for anyone looking to build
-				a personal website, blog, or portfolio with Astro.
+<PortfolioLayout title={SITE_TITLE} description={SITE_DESCRIPTION}>
+	<!-- Hero -->
+	<section class="min-h-screen flex flex-col justify-center px-4 sm:px-6 lg:px-8 pt-24 pb-16">
+		<div class="max-w-4xl mx-auto text-center">
+			<h1 class="font-serif text-5xl sm:text-6xl lg:text-7xl font-light text-stone-900 leading-tight tracking-tight">
+				Capturing Moments<br />
+				<span class="italic text-stone-600">That Last Forever</span>
+			</h1>
+			<p class="mt-8 text-lg sm:text-xl text-stone-600 max-w-2xl mx-auto font-sans">
+				Award-winning photography specializing in portrait, landscape, and event photography that tells your unique story.
 			</p>
-			<p>
-				This template comes with a few integrations already configured in your
-				<code>astro.config.mjs</code> file. You can customize your setup with
-				<a href="https://astro.build/integrations">Astro Integrations</a> to add tools like Tailwind,
-				React, or Vue to your project.
-			</p>
-			<p>Here are a few ideas on how to get started with the template:</p>
-			<ul>
-				<li>Edit this page in <code>src/pages/index.astro</code></li>
-				<li>Edit the site header items in <code>src/components/Header.astro</code></li>
-				<li>Add your name to the footer in <code>src/components/Footer.astro</code></li>
-				<li>Check out the included blog posts in <code>src/content/blog/</code></li>
-				<li>Customize the blog post page layout in <code>src/layouts/BlogPost.astro</code></li>
-			</ul>
-			<p>
-				Have fun! If you get stuck, remember to <a href="https://docs.astro.build/"
-					>read the docs
-				</a> or <a href="https://astro.build/chat">join us on Discord</a> to ask questions.
-			</p>
-			<p>
-				Looking for a blog template with a bit more personality? Check out <a
-					href="https://github.com/Charca/astro-blog-template"
-					>astro-blog-template
-				</a> by <a href="https://twitter.com/Charca">Maxi Ferreira</a>.
-			</p>
-		</main>
-		<Footer />
-	</body>
-</html>
+			<div class="mt-12 flex flex-wrap justify-center gap-4">
+				<a
+					href="#gallery"
+					class="inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors"
+				>
+					Our Gallery
+				</a>
+				<a
+					href="#contact"
+					class="inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-colors"
+				>
+					Contact Me
+				</a>
+			</div>
+		</div>
+	</section>
+
+	<!-- Gallery -->
+	<section id="gallery" class="py-20 bg-white">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="text-center mb-16">
+				<h2 class="font-serif text-4xl sm:text-5xl font-light text-stone-900">Gallery</h2>
+				<p class="mt-4 text-stone-600 max-w-2xl mx-auto">
+					A curated collection of moments frozen in time, each telling a unique story through light and shadow.
+				</p>
+			</div>
+			{galleryItems.length > 0 ? (
+				<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+					{galleryItems.map((item) => {
+						const album = albums.find((a) => a.items.some((i) => i.id === item.id));
+						return (
+						<a
+							href={album ? `/gallery/${album.slug}` : "#"}
+							class="group block aspect-square overflow-hidden rounded-sm bg-stone-200"
+						>
+							<img
+								src={item.thumbUrl}
+								alt={item.albumName}
+								loading="lazy"
+								class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+							/>
+						</a>
+					);
+					})}
+				</div>
+			) : (
+				<p class="text-center text-stone-500 py-12">No photos yet. Check back soon.</p>
+			)}
+		</div>
+	</section>
+
+	<!-- Services -->
+	<section id="services" class="py-20 bg-stone-100">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="text-center mb-16">
+				<h2 class="font-serif text-4xl sm:text-5xl font-light text-stone-900">Our Services</h2>
+				<p class="mt-4 text-stone-600 max-w-2xl mx-auto">
+					Discover our range of professional photography services tailored to capture your unique moments.
+				</p>
+			</div>
+			<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+				<div class="bg-white p-8 rounded-sm shadow-sm">
+					<h3 class="font-serif text-xl font-semibold text-stone-900">Portrait Photography</h3>
+					<p class="mt-3 text-stone-600">
+						Timeless portraits that capture your personality, perfect for individuals, families, or professionals.
+					</p>
+					<p class="mt-4 font-medium text-stone-900">From $200 · 1-hour session</p>
+				</div>
+				<div class="bg-white p-8 rounded-sm shadow-sm">
+					<h3 class="font-serif text-xl font-semibold text-stone-900">Event Photography</h3>
+					<p class="mt-3 text-stone-600">
+						Capture every moment of your special events, from weddings to corporate gatherings.
+					</p>
+					<p class="mt-4 font-medium text-stone-900">From $500 · 4-hour coverage</p>
+				</div>
+				<div class="bg-white p-8 rounded-sm shadow-sm">
+					<h3 class="font-serif text-xl font-semibold text-stone-900">Landscape Photography</h3>
+					<p class="mt-3 text-stone-600">
+						Breathtaking nature and cityscape photography for your home or office decor.
+					</p>
+					<p class="mt-4 font-medium text-stone-900">From $350 · Half-day session</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- Contact -->
+	<section id="contact" class="py-20 bg-white">
+		<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="text-center mb-12">
+				<h2 class="font-serif text-4xl sm:text-5xl font-light text-stone-900">Contact Us</h2>
+				<p class="mt-4 text-stone-600">
+					Get in touch to discuss your photography needs or book a session.
+				</p>
+			</div>
+			<form
+				class="space-y-6"
+				action="#"
+				method="post"
+			>
+				<div>
+					<label for="name" class="block text-sm font-medium text-stone-700 mb-2">Name</label>
+					<input
+						type="text"
+						id="name"
+						name="name"
+						required
+						class="w-full px-4 py-3 border border-stone-300 rounded-sm focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none transition-shadow"
+						placeholder="Your name"
+					/>
+				</div>
+				<div>
+					<label for="email" class="block text-sm font-medium text-stone-700 mb-2">Email</label>
+					<input
+						type="email"
+						id="email"
+						name="email"
+						required
+						class="w-full px-4 py-3 border border-stone-300 rounded-sm focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none transition-shadow"
+						placeholder="you@example.com"
+					/>
+				</div>
+				<div>
+					<label for="message" class="block text-sm font-medium text-stone-700 mb-2">Message</label>
+					<textarea
+						id="message"
+						name="message"
+						rows="5"
+						required
+						class="w-full px-4 py-3 border border-stone-300 rounded-sm focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none transition-shadow resize-none"
+						placeholder="Tell me about your project..."
+					></textarea>
+				</div>
+				<button
+					type="submit"
+					class="w-full sm:w-auto px-8 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-colors"
+				>
+					Send Message
+				</button>
+			</form>
+		</div>
+	</section>
+</PortfolioLayout>
