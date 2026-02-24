@@ -27,12 +27,18 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 	if (!raw && (variant === "thumb" || variant === "hero")) {
 		const meta = (item as { meta: string | null }).meta;
 		let gravity: { x: number; y: number } | undefined;
+		let zoom = 1;
 		if (meta) {
 			try {
-				const parsed = JSON.parse(meta) as { crop?: Record<string, { x: number; y: number }> };
+				const parsed = JSON.parse(meta) as {
+					crop?: Record<string, { x: number; y: number; zoom?: number }>;
+				};
 				const crop = parsed?.crop?.[variant];
 				if (crop && typeof crop.x === "number" && typeof crop.y === "number") {
 					gravity = { x: crop.x, y: crop.y };
+					if (typeof crop.zoom === "number" && crop.zoom >= 0.5 && crop.zoom <= 3) {
+						zoom = crop.zoom;
+					}
 				}
 			} catch {
 				// ignore
@@ -40,7 +46,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 		}
 		const origin = url.origin;
 		const sourceUrl = `${origin}/api/public/items/${params.id}/image?raw=1`;
-		const transformedUrl = getCfImageUrl(origin, sourceUrl, variant, gravity);
+		const transformedUrl = getCfImageUrl(origin, sourceUrl, variant, gravity, zoom);
 		return Response.redirect(transformedUrl, 302);
 	}
 

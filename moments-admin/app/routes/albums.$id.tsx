@@ -127,6 +127,7 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 	const [ppError, setPpError] = useState<string | null>(null);
 	const [ppAdding, setPpAdding] = useState(false);
 	const ppScrollRef = useRef<HTMLDivElement>(null);
+	const cropAreaRef = useRef<HTMLDivElement>(null);
 	const revalidator = useRevalidator();
 
 	const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -141,7 +142,9 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 	const [previewTags, setPreviewTags] = useState<{ id: string; name: string }[]>([]);
 	const [previewSaving, setPreviewSaving] = useState(false);
 	const [previewTagInput, setPreviewTagInput] = useState("");
-	const [editCrop, setEditCrop] = useState<Record<string, { x: number; y: number }>>({});
+	const [editCrop, setEditCrop] = useState<
+		Record<string, { x: number; y: number; zoom?: number }>
+	>({});
 	const [editSaving, setEditSaving] = useState(false);
 	const [editVariant, setEditVariant] = useState<"thumb" | "grid" | "hero">("thumb");
 
@@ -153,13 +156,28 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 
 	useEffect(() => {
 		if (editItem) {
-			const defaultCrop = { thumb: { x: 0.5, y: 0.5 }, grid: { x: 0.5, y: 0.5 }, hero: { x: 0.5, y: 0.5 } };
-			let saved: Record<string, { x: number; y: number }> = defaultCrop;
+			const defaultCrop = {
+				thumb: { x: 0.5, y: 0.5, zoom: 1 },
+				grid: { x: 0.5, y: 0.5, zoom: 1 },
+				hero: { x: 0.5, y: 0.5, zoom: 1 },
+			};
+			let saved: Record<string, { x: number; y: number; zoom?: number }> = defaultCrop;
 			if (editItem.meta) {
 				try {
-					const parsed = JSON.parse(editItem.meta) as { crop?: Record<string, { x: number; y: number }> };
+					const parsed = JSON.parse(editItem.meta) as {
+						crop?: Record<string, { x: number; y: number; zoom?: number }>;
+					};
 					if (parsed.crop && typeof parsed.crop === "object") {
-						saved = { ...defaultCrop, ...parsed.crop };
+						for (const k of ["thumb", "grid", "hero"]) {
+							const c = parsed.crop[k];
+							if (c && typeof c.x === "number" && typeof c.y === "number") {
+								saved[k] = {
+									x: c.x,
+									y: c.y,
+									zoom: typeof c.zoom === "number" ? Math.max(0.5, Math.min(3, c.zoom)) : 1,
+								};
+							}
+						}
 					}
 				} catch {
 					// ignore invalid meta
@@ -169,6 +187,17 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 			setEditVariant("thumb");
 		}
 	}, [editItem]);
+
+	useEffect(() => {
+		const el = cropAreaRef.current;
+		if (!el || !editItem) return;
+		const handler = (e: WheelEvent) => {
+			e.preventDefault();
+			updateZoom(editVariant, e.deltaY > 0 ? -0.1 : 0.1);
+		};
+		el.addEventListener("wheel", handler, { passive: false });
+		return () => el.removeEventListener("wheel", handler);
+	}, [editItem, editVariant]);
 
 	async function savePreviewChanges() {
 		if (!previewItem) return;
@@ -238,7 +267,26 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 		const rect = el.getBoundingClientRect();
 		const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
 		const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-		setEditCrop((prev) => ({ ...prev, [variant]: { x, y } }));
+		setEditCrop((prev) => ({
+			...prev,
+			[variant]: { ...prev[variant], x, y, zoom: prev[variant]?.zoom ?? 1 },
+		}));
+	}
+
+	function updateZoom(variant: "thumb" | "grid" | "hero", delta: number) {
+		setEditCrop((prev) => {
+			const cur = prev[variant] ?? { x: 0.5, y: 0.5, zoom: 1 };
+			const zoom = Math.max(0.5, Math.min(3, (cur.zoom ?? 1) + delta));
+			return { ...prev, [variant]: { ...cur, zoom } };
+		});
+	}
+
+	function setZoom(variant: "thumb" | "grid" | "hero", value: number) {
+		const zoom = Math.max(0.5, Math.min(3, value));
+		setEditCrop((prev) => ({
+			...prev,
+			[variant]: { ...(prev[variant] ?? { x: 0.5, y: 0.5 }), zoom },
+		}));
 	}
 
 	const PP_PAGE_SIZE = 24;
@@ -824,6 +872,7 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 									))}
 								</div>
 								<div
+									ref={cropAreaRef}
 									className="relative bg-gray-900 rounded-lg overflow-hidden cursor-crosshair w-full max-w-lg mx-auto flex-shrink-0"
 									style={{
 										aspectRatio:
@@ -851,6 +900,12 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 											objectPosition: editCrop[editVariant]
 												? `${editCrop[editVariant].x * 100}% ${editCrop[editVariant].y * 100}%`
 												: "50% 50%",
+											transform: editCrop[editVariant]?.zoom
+												? `scale(${editCrop[editVariant].zoom})`
+												: undefined,
+											transformOrigin: editCrop[editVariant]
+												? `${editCrop[editVariant].x * 100}% ${editCrop[editVariant].y * 100}%`
+												: "50% 50%",
 										}}
 									/>
 									{editCrop[editVariant] && (
@@ -864,8 +919,37 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 										/>
 									)}
 								</div>
+								<div className="flex items-center gap-3">
+									<span className="text-sm text-gray-500 dark:text-gray-400">
+										Zoom: {((editCrop[editVariant]?.zoom ?? 1) * 100).toFixed(0)}%
+									</span>
+									<input
+										type="range"
+										min="50"
+										max="300"
+										value={((editCrop[editVariant]?.zoom ?? 1) * 100)}
+										onChange={(e) =>
+											setZoom(editVariant, parseInt(e.target.value, 10) / 100)
+										}
+										className="flex-1 max-w-xs"
+									/>
+									<button
+										type="button"
+										onClick={() => updateZoom(editVariant, -0.25)}
+										className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded"
+									>
+										−
+									</button>
+									<button
+										type="button"
+										onClick={() => updateZoom(editVariant, 0.25)}
+										className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded"
+									>
+										+
+									</button>
+								</div>
 								<p className="text-sm text-gray-500 dark:text-gray-400">
-									Click and drag to set the focal point for this variant.
+									Click and drag to set the focal point. Scroll or use +/- to zoom.
 								</p>
 							</div>
 						</div>
