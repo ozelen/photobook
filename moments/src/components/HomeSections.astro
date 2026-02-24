@@ -12,7 +12,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 <section
 	id="hero"
 	data-page="hero"
-	class="min-w-[100vw] w-[100vw] flex-shrink-0 snap-start flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 relative overflow-hidden"
+	class="min-w-[100vw] w-[100vw] min-h-full flex-shrink-0 snap-start flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 relative overflow-hidden"
 >
 	<div id="hero-image-wrap" class="absolute inset-0 z-0">
 		{heroImageUrl && (
@@ -37,23 +37,10 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 				Award-winning photography specializing in portrait, landscape, and event photography that tells your unique story.
 			</p>
 		</div>
-		<div id="hero-ctas" class="mt-12 flex flex-wrap justify-center gap-4 min-h-[3rem]">
-			<a
-				href="/gallery"
-				data-hero-cta="gallery"
-				class="scroll-to-btn hero-cta-link inline-flex items-center px-6 py-3 bg-stone-900 text-white font-medium rounded-sm hover:bg-stone-800 transition-all duration-300 no-underline border border-stone-900"
-			>
-				Our Gallery
-			</a>
-			<a
-				href="/contact"
-				class:list={[
-					"scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline",
-					heroImageUrl ? "border border-white/80 text-white hover:bg-white/10" : "border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100",
-				]}
-			>
-				Contact Me
-			</a>
+	</div>
+	<div id="hero-ctas" class="hero-ctas-fixed">
+		<div id="hero-picker-wrap" class="hero-picker-wrap">
+			<div id="hero-picker" class="hero-picker" role="listbox" aria-label="Select category"></div>
 		</div>
 	</div>
 </section>
@@ -334,29 +321,50 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 		});
 
 		document.getElementById('hero')?.addEventListener('click', (e) => {
-			const link = e.target?.closest?.('.hero-cta-link');
+			const link = e.target?.closest?.('.hero-picker-item');
 			if (!link) return;
-			const ctaType = link.getAttribute('data-hero-cta');
 			const tagSlug = link.getAttribute('data-tag-slug');
-			const href = link.getAttribute('href') || '';
-			if (ctaType === 'gallery') {
-				e.preventDefault();
-				currentHeroTag = '';
-				loadGallery('');
-				scrollToSection('gallery');
-				history.pushState({ section: 'gallery', tag: '' }, '', '/gallery');
+			if (!tagSlug) return;
+			e.preventDefault();
+			if (currentHeroTag === tagSlug) {
+				window.location.href = `/gallery/${tagSlug}`;
 				return;
 			}
-			if (ctaType === 'tag' && tagSlug) {
-				e.preventDefault();
-				if (currentHeroTag === tagSlug) {
-					window.location.href = `/gallery/${tagSlug}`;
-					return;
-				}
-				currentHeroTag = tagSlug;
-				loadGallery(tagSlug);
-				scrollToSection('gallery');
-				history.pushState({ section: 'gallery', tag: tagSlug }, '', `/gallery/${tagSlug}`);
+			currentHeroTag = tagSlug;
+			loadGallery(tagSlug);
+			scrollToSection('gallery');
+			history.pushState({ section: 'gallery', tag: tagSlug }, '', `/gallery/${tagSlug}`);
+		});
+
+		document.getElementById('hero-picker')?.addEventListener('scroll', () => {
+			if (pickerIsJumping) return;
+			const wrap = document.getElementById('hero-picker-wrap');
+			const picker = document.getElementById('hero-picker');
+			if (!wrap || !picker || heroSlides.length === 0) return;
+			const N = heroSlides.length;
+			const center = wrap.clientHeight / 2;
+			const scrollCenter = picker.scrollTop + center;
+			const rawIdx = Math.round((scrollCenter - PICKER_PADDING - PICKER_ITEM_HEIGHT / 2) / PICKER_ITEM_HEIGHT);
+			let idx = rawIdx;
+			if (rawIdx < N) {
+				pickerIsJumping = true;
+				picker.scrollTop += N * PICKER_ITEM_HEIGHT;
+				idx = rawIdx;
+				requestAnimationFrame(() => { pickerIsJumping = false; });
+			} else if (rawIdx >= 2 * N) {
+				pickerIsJumping = true;
+				picker.scrollTop -= N * PICKER_ITEM_HEIGHT;
+				idx = rawIdx - 2 * N;
+				requestAnimationFrame(() => { pickerIsJumping = false; });
+			} else {
+				idx = rawIdx - N;
+			}
+			idx = Math.max(0, Math.min(N - 1, idx));
+			updatePickerFromScroll();
+			const slide = heroSlides[idx];
+			if (slide && (slide.slug ?? '') !== currentHeroTag) {
+				currentHeroTag = slide.slug ?? '';
+				applyHeroSlide(slide);
 			}
 		});
 
@@ -435,33 +443,75 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 					}
 				}
 			}
-			highlightHeroCta(slide.slug, !!slide.heroImageUrl);
+			scrollPickerToSlide(slide.slug ?? '');
+			const picker = document.getElementById('hero-picker');
+			if (picker) {
+				const textClass = heroImageUrl ? 'text-white' : 'text-stone-700';
+				picker.querySelectorAll('.hero-picker-item').forEach((el) => {
+					el.classList.remove('text-white', 'text-stone-700');
+					el.classList.add(textClass);
+				});
+			}
 		}
 
-		function highlightHeroCta(activeSlug, hasHeroImage) {
-			const heroCtasEl = document.getElementById('hero-ctas');
-			if (!heroCtasEl) return;
-			const ctaBase = 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline';
-			const links = heroCtasEl.querySelectorAll('.hero-cta-link');
-			links.forEach((link) => {
-				const slug = link.getAttribute('data-tag-slug') ?? (link.getAttribute('data-hero-cta') === 'gallery' ? '' : null);
-				if (slug === null) return;
-				const isActive = slug === activeSlug;
-				if (hasHeroImage) {
-					link.className = isActive
-						? `${ctaBase} bg-stone-900 text-white border border-stone-900 hover:bg-stone-800`
-						: `${ctaBase} bg-transparent border border-white/80 text-white hover:bg-white/10`;
-				} else {
-					link.className = isActive
-						? `${ctaBase} bg-stone-900 text-white border border-stone-900 hover:bg-stone-800`
-						: `${ctaBase} bg-white border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100`;
-				}
+		const PICKER_ITEM_HEIGHT = 36;
+		const PICKER_PADDING = 40;
+		let pickerIsJumping = false;
+
+		function renderPicker(slides, activeSlug, hasHeroImage) {
+			const wrap = document.getElementById('hero-picker-wrap');
+			const picker = document.getElementById('hero-picker');
+			if (!wrap || !picker) return;
+			const N = slides.length;
+			if (N === 0) {
+				picker.innerHTML = '';
+				return;
+			}
+			const textClass = hasHeroImage ? 'text-white' : 'text-stone-700';
+			const tripled = [...slides, ...slides, ...slides];
+			const items = tripled.map((s, i) => {
+				const slug = s.slug ?? '';
+				const name = s.name ?? '';
+				return `<button type="button" role="option" class="hero-picker-item ${textClass}" data-hero-cta="tag" data-tag-slug="${escapeHtml(slug)}">${escapeHtml(name)}</button>`;
+			}).join('');
+			picker.innerHTML = items;
+			const idx = slides.findIndex((s) => (s.slug ?? '') === activeSlug);
+			const startIdx = idx >= 0 ? idx : 0;
+			const scrollToIdx = N + startIdx;
+			picker.scrollTop = scrollToIdx * PICKER_ITEM_HEIGHT + PICKER_PADDING - (wrap.clientHeight / 2 - PICKER_ITEM_HEIGHT / 2);
+			updatePickerFromScroll();
+		}
+
+		function updatePickerFromScroll() {
+			const wrap = document.getElementById('hero-picker-wrap');
+			const picker = document.getElementById('hero-picker');
+			if (!wrap || !picker || heroSlides.length === 0) return;
+			const N = heroSlides.length;
+			const center = wrap.clientHeight / 2;
+			picker.querySelectorAll('.hero-picker-item').forEach((el, i) => {
+				const top = PICKER_PADDING + i * PICKER_ITEM_HEIGHT;
+				const elCenter = top + PICKER_ITEM_HEIGHT / 2 - picker.scrollTop;
+				const dist = Math.abs(center - elCenter);
+				const t = Math.max(0, 1 - dist / center);
+				const scale = 0.5 + t * 0.5;
+				const opacity = 0.4 + t * 0.6;
+				el.style.transform = `scale(${scale})`;
+				el.style.opacity = String(opacity);
 			});
-			const contactBtn = heroCtasEl.querySelector('a[href="/contact"]');
-			if (contactBtn) {
-				contactBtn.className = hasHeroImage
-					? 'scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline border border-white/80 text-white hover:bg-white/10'
-					: 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-all duration-300 no-underline';
+		}
+
+		function scrollPickerToSlide(activeSlug) {
+			const wrap = document.getElementById('hero-picker-wrap');
+			const picker = document.getElementById('hero-picker');
+			if (!wrap || !picker || heroSlides.length === 0) return;
+			const N = heroSlides.length;
+			const idx = heroSlides.findIndex((s) => (s.slug ?? '') === activeSlug);
+			if (idx >= 0) {
+				pickerIsJumping = true;
+				const scrollToIdx = N + idx;
+				picker.scrollTop = scrollToIdx * PICKER_ITEM_HEIGHT + PICKER_PADDING - (wrap.clientHeight / 2 - PICKER_ITEM_HEIGHT / 2);
+				updatePickerFromScroll();
+				requestAnimationFrame(() => { pickerIsJumping = false; });
 			}
 		}
 
@@ -546,7 +596,6 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 					const { galleryItems = [], topTags = [], heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt } = data;
 					if (loadingEl) loadingEl.classList.add('hidden');
 					const defaultData = tag ? await fetch('/api/gallery.json').then((r) => (r.ok ? r.json() : null)) : data;
-					const defaultSlide = defaultData ? { slug: '', name: 'Our Gallery', heroTitle: defaultData.heroTitle, heroSubtitle: defaultData.heroSubtitle, heroImageUrl: defaultData.heroImageUrl, heroImageAlt: defaultData.heroImageAlt } : null;
 					const tagSlides = await Promise.all(
 						topTags.map((t) =>
 							tag === t.slug
@@ -556,31 +605,37 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 										.then((d) => d ? { slug: t.slug, name: t.name, heroTitle: d.heroTitle, heroSubtitle: d.heroSubtitle, heroImageUrl: d.heroImageUrl, heroImageAlt: d.heroImageAlt } : null)
 						)
 					);
-					heroSlides = [defaultSlide, ...tagSlides.filter(Boolean)].filter(Boolean);
+					heroSlides = tagSlides.filter(Boolean);
+					const displaySlide = heroSlides.length > 0 && !tag ? heroSlides[0] : (tag ? heroSlides.find((s) => s.slug === tag) : null);
+					const displayHero = displaySlide ?? defaultData;
+					const displayTitle = displayHero?.heroTitle ?? apiHeroTitle;
+					const displaySubtitle = displayHero?.heroSubtitle ?? apiHeroSubtitle;
+					const displayUrl = displayHero?.heroImageUrl ?? apiHeroUrl;
+					const displayAlt = displayHero?.heroImageAlt ?? apiHeroAlt;
+					if (heroSlides.length > 0 && !tag) {
+						currentHeroTag = heroSlides[0].slug ?? '';
+					}
 					const wrap = document.getElementById('hero-image-wrap');
 					const heroContent = document.getElementById('hero-content');
 					const heroTitleEl = document.getElementById('hero-title');
 					const heroSubtitleEl = document.getElementById('hero-subtitle');
-					const heroCtasEl = document.getElementById('hero-ctas');
-					if (heroTitleEl && apiHeroTitle) {
-						const parts = String(apiHeroTitle).split(' | ');
+					if (heroTitleEl && displayTitle) {
+						const parts = String(displayTitle).split(' | ');
 						heroTitleEl.innerHTML = parts.length > 1
 							? escapeHtml(parts[0]) + '<br /><span class="italic">' + escapeHtml(parts.slice(1).join(' | ')) + '</span>'
-							: escapeHtml(apiHeroTitle);
+							: escapeHtml(displayTitle);
 					}
-					if (heroSubtitleEl && apiHeroSubtitle) {
-						heroSubtitleEl.textContent = apiHeroSubtitle;
+					if (heroSubtitleEl && displaySubtitle) {
+						heroSubtitleEl.textContent = displaySubtitle;
 					}
 					if (wrap) {
-						if (apiHeroUrl) {
-							wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(apiHeroUrl)}" alt="${escapeHtml(apiHeroAlt || '')}" class="w-full h-full object-cover hero-image-transition" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
+						if (displayUrl) {
+							wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(displayUrl)}" alt="${escapeHtml(displayAlt || '')}" class="w-full h-full object-cover hero-image-transition" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
 							if (heroContent) {
 								heroContent.classList.add('text-white');
 								heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');
 								heroContent.querySelector('h1 span')?.classList.replace('text-stone-600', 'text-white/90');
 								heroContent.querySelector('p')?.classList.replace('text-stone-600', 'text-white/90');
-								const contactBtn = heroContent.querySelector('a[href="/contact"]');
-								if (contactBtn) contactBtn.className = 'scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-colors no-underline border border-white/80 text-white hover:bg-white/10';
 							}
 						} else {
 							wrap.innerHTML = '';
@@ -589,32 +644,10 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 								heroContent.querySelector('h1')?.classList.replace('text-white', 'text-stone-900');
 								heroContent.querySelector('h1 span')?.classList.replace('text-white/90', 'text-stone-600');
 								heroContent.querySelector('p')?.classList.replace('text-white/90', 'text-stone-600');
-								const contactBtn = heroContent.querySelector('a[href="/contact"]');
-								if (contactBtn) contactBtn.className = 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-colors no-underline';
 							}
 						}
 					}
-					if (heroCtasEl) {
-						const isGalleryPrimary = !tag;
-						const hasHeroImage = !!apiHeroUrl;
-						const ctaBase = 'hero-cta-link inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline';
-						const galleryClasses = isGalleryPrimary
-							? `${ctaBase} scroll-to-btn bg-stone-900 text-white border border-stone-900 hover:bg-stone-800`
-							: (hasHeroImage ? `${ctaBase} bg-transparent border border-white/80 text-white hover:bg-white/10` : `${ctaBase} bg-white border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100`);
-						const tagCtaClasses = (t) => {
-							const active = tag === t.slug;
-							return active
-								? `${ctaBase} bg-stone-900 text-white border border-stone-900 hover:bg-stone-800`
-								: (hasHeroImage ? `${ctaBase} bg-transparent border border-white/80 text-white hover:bg-white/10` : `${ctaBase} bg-white border border-stone-300 text-stone-700 hover:border-stone-400 hover:bg-stone-100`);
-						};
-						const contactClasses = hasHeroImage
-							? 'scroll-to-btn inline-flex items-center px-6 py-3 font-medium rounded-sm transition-all duration-300 no-underline border border-white/80 text-white hover:bg-white/10'
-							: 'scroll-to-btn inline-flex items-center px-6 py-3 border border-stone-300 text-stone-700 font-medium rounded-sm hover:border-stone-400 hover:bg-stone-100 transition-all duration-300 no-underline';
-						const tagButtons = topTags.map((t) =>
-							`<a href="/gallery/${escapeHtml(t.slug)}" data-hero-cta="tag" data-tag-slug="${escapeHtml(t.slug)}" class="${tagCtaClasses(t)}">${escapeHtml(t.name)}</a>`
-						).join('');
-						heroCtasEl.innerHTML = `<a href="/gallery" data-hero-cta="gallery" class="${galleryClasses}">Our Gallery</a>${tagButtons}<a href="/contact" class="${contactClasses}">Contact Me</a>`;
-					}
+					renderPicker(heroSlides, currentHeroTag, !!displayUrl);
 					if (tagContainer && !tagContainer.innerHTML.trim() && (galleryItems.length > 0 || topTags.length > 0)) {
 						const currentTag = tag;
 						const allActive = !currentTag;

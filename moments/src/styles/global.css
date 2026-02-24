@@ -142,6 +142,61 @@ hr {
 	}
 }
 
+/* Hero picker: fixed position relative to hero section so it doesn't shift when title/subtitle change */
+.hero-ctas-fixed {
+	position: absolute;
+	left: 50%;
+	bottom: 12%;
+	transform: translateX(-50%);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1rem;
+	z-index: 10;
+}
+
+/* Hero picker wheel */
+.hero-picker-wrap {
+	height: 7rem;
+	width: 12rem;
+	overflow: hidden;
+	mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
+	-webkit-mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
+}
+.hero-picker {
+	height: 100%;
+	width: 100%;
+	overflow-y: auto;
+	overflow-x: hidden;
+	scroll-snap-type: y mandatory;
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+	padding: 2.5rem 0;
+}
+.hero-picker::-webkit-scrollbar {
+	display: none;
+}
+.hero-picker-item {
+	scroll-snap-align: center;
+	scroll-snap-stop: always;
+	height: 2.25rem;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	font-size: 1.125rem;
+	font-weight: 500;
+	transition: opacity 0.2s ease, transform 0.2s ease;
+	transform-origin: center center;
+	cursor: pointer;
+	text-decoration: none;
+	color: inherit;
+}
+.hero-picker-item:hover {
+	opacity: 1;
+}
+
 .sr-only {
 	border: 0;
 	padding: 0;
