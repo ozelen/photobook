@@ -65,3 +65,85 @@ export function getItemImageUrl(adminBaseUrl: string, itemId: string): string {
 	const base = adminBaseUrl.replace(/\/$/, "");
 	return `${base}/api/public/items/${itemId}/image`;
 }
+
+export interface PublicTag {
+	id: string;
+	name: string;
+	slug: string;
+	count: number;
+}
+
+/** Returns map of entityId -> tag slugs. entityType: 'album' | 'item'. */
+async function getTagSlugsForEntities(
+	db: D1Database,
+	entityType: "album" | "item",
+	entityIds: string[],
+): Promise<Record<string, string[]>> {
+	if (entityIds.length === 0) return {};
+	const placeholders = entityIds.map(() => "?").join(",");
+	const { results } = await db
+		.prepare(
+			`SELECT tr.entity_id, t.slug
+       FROM tag_refs tr
+       JOIN tags t ON t.id = tr.tag_id
+       WHERE tr.entity_type = ? AND tr.entity_id IN (${placeholders})
+       ORDER BY t.name ASC`,
+		)
+		.bind(entityType, ...entityIds)
+		.all();
+
+	const map: Record<string, string[]> = {};
+	for (const id of entityIds) map[id] = [];
+	for (const row of (results ?? []) as { entity_id: string; slug: string }[]) {
+		if (!map[row.entity_id].includes(row.slug)) map[row.entity_id].push(row.slug);
+	}
+	return map;
+}
+
+/** Returns map of itemId -> tag slugs (item tags + album tags). */
+export async function getItemTagSlugs(
+	db: D1Database,
+	items: { id: string; albumId: string }[],
+): Promise<Record<string, string[]>> {
+	if (items.length === 0) return {};
+	const itemIds = items.map((i) => i.id);
+	const albumIds = [...new Set(items.map((i) => i.albumId))];
+	const [itemTags, albumTags] = await Promise.all([
+		getTagSlugsForEntities(db, "item", itemIds),
+		getTagSlugsForEntities(db, "album", albumIds),
+	]);
+
+	const map: Record<string, string[]> = {};
+	for (const item of items) {
+		const slugs = new Set<string>([...(itemTags[item.id] ?? [])]);
+		if (albumTags[item.albumId]) {
+			for (const s of albumTags[item.albumId]) slugs.add(s);
+		}
+		map[item.id] = [...slugs];
+	}
+	return map;
+}
+
+/** Top tags used on public albums and items, ordered by usage count. */
+export async function getPublicTags(db: D1Database, limit = 20): Promise<PublicTag[]> {
+	const { results } = await db
+		.prepare(
+			`SELECT t.id, t.name, t.slug, COUNT(*) as count
+       FROM tag_refs tr
+       JOIN tags t ON t.id = tr.tag_id
+       WHERE
+         (tr.entity_type = 'album' AND tr.entity_id IN (SELECT id FROM albums WHERE is_public = 1))
+         OR
+         (tr.entity_type = 'item' AND tr.entity_id IN (
+           SELECT ai.item_id FROM album_items ai
+           JOIN albums a ON a.id = ai.album_id AND a.is_public = 1
+           JOIN items i ON i.id = ai.item_id AND i.deleted_at IS NULL
+         ))
+       GROUP BY t.id, t.name, t.slug
+       ORDER BY count DESC
+       LIMIT ?`,
+		)
+		.bind(limit)
+		.all();
+	return (results ?? []) as PublicTag[];
+}

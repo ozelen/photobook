@@ -1,23 +1,9 @@
 ---
 import PortfolioLayout from "../layouts/PortfolioLayout.astro";
 import HomeSections from "../components/HomeSections.astro";
-import { SITE_TITLE, SITE_DESCRIPTION } from "../consts";
-import { getPublicAlbums, getItemImageUrl } from "../lib/public-albums";
-
-const runtime = Astro.locals.runtime;
-const db = runtime.env.DB;
-const adminBaseUrl = (runtime.env as { ADMIN_BASE_URL?: string }).ADMIN_BASE_URL ?? "https://adm-moments.zelen.uk";
-
-const albums = await getPublicAlbums(db as D1Database);
-const galleryItems = albums.flatMap((a) =>
-	a.items.slice(0, 12).map((item) => ({
-		...item,
-		albumName: a.name,
-		thumbUrl: getItemImageUrl(adminBaseUrl, item.id),
-	})),
-);
+import { SITE_TITLE } from "../consts";
 ---
 
 <PortfolioLayout title="About — Moments" description="About the photographer" horizontalScroll={true} currentPath="/about">
-	<HomeSections albums={albums} galleryItems={galleryItems} adminBaseUrl={adminBaseUrl} initialSection="about" />
+	<HomeSections initialSection="about" />
 </PortfolioLayout>

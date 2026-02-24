@@ -1,13 +1,8 @@
 ---
-import type { PublicAlbum } from "../lib/public-albums";
-
 interface Props {
-	albums: PublicAlbum[];
-	galleryItems: { id: string; albumName: string; thumbUrl: string }[];
-	adminBaseUrl: string;
 	initialSection?: "gallery" | "services" | "contact" | "about";
 }
-const { albums, galleryItems, adminBaseUrl, initialSection } = Astro.props;
+const { initialSection } = Astro.props;
 ---
 
 <!-- Hero -->
@@ -45,7 +40,7 @@ const { albums, galleryItems, adminBaseUrl, initialSection } = Astro.props;
 <section
 	id="gallery"
 	data-page="gallery"
-	class="min-w-[100vw] w-[100vw] flex-shrink-0 snap-start flex flex-col justify-center overflow-y-auto py-16 px-4 sm:px-6 lg:px-8 bg-white"
+	class="min-w-[100vw] w-[100vw] flex-shrink-0 snap-start flex flex-col justify-start overflow-y-auto py-16 px-4 sm:px-6 lg:px-8 bg-white"
 >
 	<div class="max-w-7xl mx-auto w-full">
 		<div class="text-center mb-12">
@@ -54,28 +49,18 @@ const { albums, galleryItems, adminBaseUrl, initialSection } = Astro.props;
 				A curated collection of moments frozen in time, each telling a unique story through light and shadow.
 			</p>
 		</div>
-		{galleryItems.length > 0 ? (
-			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-				{galleryItems.map((item) => {
-					const album = albums.find((a) => a.items.some((i) => i.id === item.id));
-					return (
-						<a
-							href={album ? `/gallery/${album.slug}` : "#"}
-							class="group block aspect-square overflow-hidden rounded-sm bg-stone-200"
-						>
-							<img
-								src={item.thumbUrl}
-								alt={item.albumName}
-								loading="lazy"
-								class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-							/>
-						</a>
-					);
-				})}
-			</div>
-		) : (
-			<p class="text-center text-stone-500 py-12">No photos yet. Check back soon.</p>
-		)}
+		<div
+			id="gallery-tag-buttons"
+			class="flex flex-nowrap gap-2 overflow-x-auto pb-4 -mx-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-stone-200 [&::-webkit-scrollbar-thumb]:rounded-full"
+		></div>
+		<div id="gallery-content">
+			<p id="gallery-loading" class="text-center text-stone-500 py-12">Loading gallery…</p>
+			<div id="gallery-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 hidden"></div>
+			<p id="gallery-empty" class="hidden text-center text-stone-500 py-12">No photos yet. Check back soon.</p>
+			<p id="gallery-empty-filter" class="hidden text-center text-stone-500 py-12">
+				No photos with this tag.
+			</p>
+		</div>
 	</div>
 </section>
 
@@ -293,7 +278,7 @@ const { albums, galleryItems, adminBaseUrl, initialSection } = Astro.props;
 		}
 	}
 
-	document.addEventListener('DOMContentLoaded', () => {
+	function init() {
 		const scroll = document.querySelector('main');
 		const sectionPaths = ['/', '/gallery', '/services', '/contact', '/about'];
 
@@ -364,5 +349,91 @@ const { albums, galleryItems, adminBaseUrl, initialSection } = Astro.props;
 			const idx = SECTIONS.indexOf(section);
 			if (idx < SECTIONS.length - 1) scrollToSection(SECTIONS[idx + 1]);
 		});
-	});
+
+		// Gallery tag filter: fetch from API when tag is clicked
+		const gallerySection = document.getElementById('gallery');
+		if (gallerySection) {
+			gallerySection.addEventListener('click', (e) => {
+				const btn = e.target?.closest?.('.gallery-tag-btn');
+				if (!btn) return;
+				e.preventDefault();
+				e.stopPropagation();
+				const tag = btn.getAttribute('data-gallery-tag') ?? '';
+				gallerySection.querySelectorAll('.gallery-tag-btn').forEach((b) => {
+					const slug = b.getAttribute('data-gallery-tag') ?? '';
+					const isActive = slug === tag;
+					b.classList.toggle('bg-stone-900', isActive);
+					b.classList.toggle('text-white', isActive);
+					b.classList.toggle('border-stone-900', isActive);
+					b.classList.toggle('bg-white', !isActive);
+					b.classList.toggle('text-stone-700', !isActive);
+					b.classList.toggle('border-stone-300', !isActive);
+				});
+				loadGallery(tag);
+			});
+		}
+
+		function loadGallery(tag) {
+			const url = tag ? `/api/gallery.json?tag=${encodeURIComponent(tag)}` : '/api/gallery.json';
+			const gridEl = document.getElementById('gallery-grid');
+			const loadingEl = document.getElementById('gallery-loading');
+			const emptyEl = document.getElementById('gallery-empty');
+			const emptyFilterEl = document.getElementById('gallery-empty-filter');
+			const tagContainer = document.getElementById('gallery-tag-buttons');
+			if (loadingEl) loadingEl.classList.remove('hidden');
+			if (gridEl) gridEl.classList.add('hidden');
+			if (emptyEl) emptyEl.classList.add('hidden');
+			if (emptyFilterEl) emptyFilterEl.classList.add('hidden');
+			fetch(url)
+				.then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load gallery'))))
+				.then((data) => {
+					const { galleryItems = [], topTags = [] } = data;
+					if (loadingEl) loadingEl.classList.add('hidden');
+					if (tagContainer && !tagContainer.innerHTML.trim() && (galleryItems.length > 0 || topTags.length > 0)) {
+						const tagButtons =
+							'<button type="button" data-gallery-tag="" class="gallery-tag-btn flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm bg-stone-900 text-white hover:bg-stone-800 transition-colors whitespace-nowrap border border-stone-900">All</button>' +
+							topTags
+								.map(
+									(t) =>
+										`<button type="button" data-gallery-tag="${escapeHtml(t.slug)}" class="gallery-tag-btn flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm border border-stone-300 text-stone-700 hover:bg-stone-100 hover:border-stone-400 transition-colors whitespace-nowrap bg-white">${escapeHtml(t.name)}</button>`,
+								)
+								.join('');
+						tagContainer.innerHTML = tagButtons;
+					}
+					if (gridEl) {
+						gridEl.innerHTML = galleryItems
+							.map(
+								(item) =>
+									`<a href="/gallery/${escapeHtml(item.albumSlug)}" data-gallery-item data-tag-slugs="${escapeHtml((item.tagSlugs || []).join(' '))}" class="group block aspect-square overflow-hidden rounded-sm bg-stone-200"><img src="${escapeHtml(item.thumbUrl)}" alt="${escapeHtml(item.albumName)}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" /></a>`,
+							)
+							.join('');
+						gridEl.classList.toggle('hidden', galleryItems.length === 0);
+					}
+					if (emptyEl) emptyEl.classList.toggle('hidden', galleryItems.length > 0);
+					if (emptyFilterEl) emptyFilterEl.classList.toggle('hidden', galleryItems.length > 0 || !tag);
+				})
+				.catch(() => {
+					if (loadingEl) loadingEl.classList.add('hidden');
+					if (emptyEl) {
+						emptyEl.textContent = 'Unable to load gallery. Please try again later.';
+						emptyEl.classList.remove('hidden');
+					}
+				});
+		}
+
+		// Initial fetch
+		loadGallery('');
+	}
+
+	function escapeHtml(s) {
+		const div = document.createElement('div');
+		div.textContent = s;
+		return div.innerHTML;
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', init);
+	} else {
+		init();
+	}
 </script>
