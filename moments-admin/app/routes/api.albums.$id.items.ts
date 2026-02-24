@@ -1,7 +1,7 @@
 import type { Route } from "./+types/api.albums.$id.items";
 import { getSessionUser } from "../lib/auth.server";
 import { getAlbum } from "../lib/albums.server";
-import { addItemToAlbum } from "../lib/items.server";
+import { addItemToAlbum, removeItemsFromAlbum } from "../lib/items.server";
 import { toPhotoPrismRef } from "../lib/photoprism.server";
 import { enqueueCfImagesUpload } from "../lib/enqueue-cf-images.server";
 
@@ -13,6 +13,41 @@ export async function loader() {
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
+	if (request.method === "DELETE") {
+		const secret = (context.cloudflare.env as { SESSION_SECRET?: string }).SESSION_SECRET;
+		const user = await getSessionUser(request, context.cloudflare.env.DB, secret);
+		if (!user) {
+			return Response.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const album = await getAlbum(context.cloudflare.env.DB, params.id, user.id);
+		if (!album) {
+			return Response.json({ error: "Album not found" }, { status: 404 });
+		}
+
+		let body: { itemIds?: string[] };
+		try {
+			body = (await request.json()) as { itemIds?: string[] };
+		} catch {
+			return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+		}
+
+		const itemIds = Array.isArray(body.itemIds) ? body.itemIds.filter((id): id is string => typeof id === "string") : [];
+		if (itemIds.length === 0) {
+			return Response.json({ error: "itemIds array is required" }, { status: 400 });
+		}
+
+		const result = await removeItemsFromAlbum(
+			context.cloudflare.env.DB,
+			params.id,
+			itemIds,
+			user.id,
+		);
+		if (!result) {
+			return Response.json({ error: "Failed to remove items" }, { status: 500 });
+		}
+		return Response.json({ removed: result.removed });
+	}
 	const secret = (context.cloudflare.env as { SESSION_SECRET?: string }).SESSION_SECRET;
 	const user = await getSessionUser(request, context.cloudflare.env.DB, secret);
 	if (!user) {

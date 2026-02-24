@@ -100,6 +100,9 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 	const ppScrollRef = useRef<HTMLDivElement>(null);
 	const revalidator = useRevalidator();
 
+	const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+	const [deleting, setDeleting] = useState(false);
+
 	const PP_PAGE_SIZE = 24;
 
 	useEffect(() => {
@@ -238,6 +241,37 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 			setUploading(false);
 			e.target.value = "";
 		}
+	}
+
+	async function handleDeleteSelected() {
+		if (selectedItemIds.size === 0) return;
+		if (!confirm(`Remove ${selectedItemIds.size} photo(s) from this album?`)) return;
+		setDeleting(true);
+		try {
+			const res = await fetch(`/api/albums/${album.id}/items`, {
+				method: "DELETE",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ itemIds: Array.from(selectedItemIds) }),
+			});
+			if (res.ok) {
+				setSelectedItemIds(new Set());
+				revalidator.revalidate();
+			} else {
+				const data = (await res.json()) as { error?: string };
+				alert(data.error ?? "Failed to remove photos");
+			}
+		} finally {
+			setDeleting(false);
+		}
+	}
+
+	function toggleItemSelection(itemId: string) {
+		setSelectedItemIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(itemId)) next.delete(itemId);
+			else next.add(itemId);
+			return next;
+		});
 	}
 
 	return (
@@ -436,24 +470,63 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 			)}
 
 			{items.length > 0 ? (
-				<ul className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
-					{items.map((item) => (
-						<li key={item.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
-							{item.thumbUrl ? (
-								<img
-									src={item.thumbUrl}
-									alt=""
-									loading="lazy"
-									className="w-full h-full object-cover"
-								/>
-							) : (
-								<div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
-									{item.imageId}
-								</div>
-							)}
-						</li>
-					))}
-				</ul>
+				<>
+					{selectedItemIds.size > 0 && (
+						<div className="mb-4 flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+							<span className="text-sm text-gray-700 dark:text-gray-300">
+								{selectedItemIds.size} selected
+							</span>
+							<button
+								type="button"
+								onClick={() => setSelectedItemIds(new Set())}
+								className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+							>
+								Clear
+							</button>
+							<button
+								type="button"
+								onClick={handleDeleteSelected}
+								disabled={deleting}
+								className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg font-medium text-sm"
+							>
+								{deleting ? "Removing…" : "Remove from album"}
+							</button>
+						</div>
+					)}
+					<ul className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
+						{items.map((item) => (
+							<li key={item.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+								<button
+									type="button"
+									onClick={() => toggleItemSelection(item.id)}
+									className={`relative w-full h-full block text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg ${
+										selectedItemIds.has(item.id)
+											? "ring-2 ring-blue-500 ring-offset-2"
+											: "hover:ring-2 hover:ring-gray-400 hover:ring-offset-2"
+									}`}
+								>
+									{item.thumbUrl ? (
+										<img
+											src={item.thumbUrl}
+											alt=""
+											loading="lazy"
+											className="w-full h-full object-cover"
+										/>
+									) : (
+										<div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
+											{item.imageId}
+										</div>
+									)}
+									{selectedItemIds.has(item.id) && (
+										<span className="absolute top-2 right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
+											✓
+										</span>
+									)}
+								</button>
+							</li>
+						))}
+					</ul>
+				</>
 			) : (
 				<div className="bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
 					<p className="text-gray-500 dark:text-gray-400">
