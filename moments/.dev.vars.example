@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development.
+# Override ADMIN_BASE_URL so the portfolio fetches images from your local admin.
+# Adjust the port if your admin runs on a different one (e.g. 5174).
+ADMIN_BASE_URL=http://localhost:5173

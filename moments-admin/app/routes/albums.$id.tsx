@@ -42,6 +42,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 	const rawItems = await listAlbumItems(context.cloudflare.env.DB, params.id, user.id);
 	const origin = new URL(request.url).origin;
 	const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
+	const portfolioUrl =
+		(context.cloudflare.env as { PORTFOLIO_URL?: string }).PORTFOLIO_URL ??
+		"https://moments.zelen.uk";
 	const cfDeliveryHash = (context.cloudflare.env as { CF_IMAGES_DELIVERY_HASH?: string })
 		.CF_IMAGES_DELIVERY_HASH;
 	const items = rawItems.map((item) => {
@@ -61,7 +64,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 		return { ...item, thumbUrl };
 	});
 
-	return { album, items };
+	return { album, items, portfolioUrl };
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
@@ -79,7 +82,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 }
 
 export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
-	const { album, items } = loaderData;
+	const { album, items, portfolioUrl } = loaderData;
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [uploadError, setUploadError] = useState<string | null>(null);
 	const [uploading, setUploading] = useState(false);
@@ -250,6 +253,16 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 					</p>
 				</div>
 				<div className="flex gap-2">
+					{album.isPublic === 1 && portfolioUrl && (
+						<a
+							href={`${portfolioUrl}/gallery/${album.slug}`}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="px-4 py-2 border border-gray-600 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium text-sm"
+						>
+							View on portfolio →
+						</a>
+					)}
 					<Link
 						to={`/albums/${album.id}/edit`}
 						className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm"

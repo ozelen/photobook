@@ -5,6 +5,7 @@ export default [
 	route("login", "routes/login.tsx"),
 	route("logout", "routes/logout.tsx"),
 	route("albums", "routes/albums.index.tsx"),
+	route("gallery", "routes/gallery.tsx"),
 	route("albums/new", "routes/albums.new.tsx"),
 	route("albums/:id", "routes/albums.$id.tsx"),
 	route("albums/:id/edit", "routes/albums.$id.edit.tsx"),

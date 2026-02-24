@@ -75,6 +75,12 @@ export default function App() {
 								>
 									Albums
 								</a>
+								<a
+									href="/gallery"
+									className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+								>
+									Gallery
+								</a>
 							</div>
 							<div className="flex items-center gap-4">
 								<span className="text-sm text-gray-600 dark:text-gray-400">

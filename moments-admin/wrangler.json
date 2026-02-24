@@ -45,6 +45,7 @@
     "CF_IMAGES_ACCOUNT_ID": "",
     "CF_IMAGES_DELIVERY_HASH": "",
     "WEBDAV_BASE_URL": "https://photo.zelen.uk/originals",
-    "PHOTOPRISM_BASE_URL": "https://photo.zelen.uk"
+    "PHOTOPRISM_BASE_URL": "https://photo.zelen.uk",
+    "PORTFOLIO_URL": "https://moments.zelen.uk"
   }
 }

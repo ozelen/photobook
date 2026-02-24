@@ -139,6 +139,18 @@ cd moments && wrangler dev --persist
 
 (Astro dev server uses platform proxy; D1 state persists in `.wrangler/state/`)
 
+### Gallery: Admin → Portfolio
+
+The Astro gallery shows albums you mark as **Public** in the admin:
+
+1. In admin: **Albums** → open an album → **Edit**
+2. Check **Public (visible on portfolio)** → **Save**
+3. The portfolio gallery (homepage and `/gallery`) will show that album and its photos
+
+Both apps share the same D1 database. Admin uses `moments/.wrangler/state` for local persistence, so data added in admin appears on the portfolio when both run locally. Run `npm run db:migrate:local` before first use.
+
+**Local dev:** For gallery images to load, the portfolio must fetch from your local admin. Copy `moments/.dev.vars.example` to `moments/.dev.vars` and set `ADMIN_BASE_URL` to your admin URL (e.g. `http://localhost:5173`).
+
 ## 6. Pre-Commit Hooks (Optional)
 
 After `git init`:
