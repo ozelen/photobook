@@ -56,20 +56,38 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 		.CF_IMAGES_DELIVERY_HASH;
 	const items = rawItems.map((item) => {
 		const directCf = cfDeliveryHash && getCfImagesDeliveryUrl(item.imageId, cfDeliveryHash, "thumb");
+		const directCfGrid = cfDeliveryHash && getCfImagesDeliveryUrl(item.imageId, cfDeliveryHash, "grid");
+		const directCfHero = cfDeliveryHash && getCfImagesDeliveryUrl(item.imageId, cfDeliveryHash, "hero");
+		const baseImagePath = album.isPublic === 1
+			? `/api/public/items/${item.id}/image`
+			: `/api/items/${item.id}/image`;
+		const baseImageUrl = `${origin}${baseImagePath}`;
 		const thumbUrl =
 			directCf
 				? directCf
 				: album.isPublic === 1
 					? isLocal
-						? `/api/public/items/${item.id}/image`
-						: getCfImageUrl(
-								origin,
-								`${origin}/api/public/items/${item.id}/image`,
-								"thumb",
-							)
-					: `/api/items/${item.id}/image`;
+						? baseImagePath
+						: getCfImageUrl(origin, baseImageUrl, "thumb")
+					: baseImagePath;
+		const gridUrl =
+			directCfGrid
+				? directCfGrid
+				: album.isPublic === 1
+					? isLocal
+						? baseImagePath
+						: getCfImageUrl(origin, baseImageUrl, "grid")
+					: baseImagePath;
+		const heroUrl =
+			directCfHero
+				? directCfHero
+				: album.isPublic === 1
+					? isLocal
+						? baseImagePath
+						: getCfImageUrl(origin, baseImageUrl, "hero")
+					: baseImagePath;
 		const tags = itemTagsMap[item.id] ?? [];
-		return { ...item, thumbUrl, tags };
+		return { ...item, thumbUrl, gridUrl, heroUrl, tags };
 	});
 
 	return { album, items, albumTags, portfolioUrl };
@@ -113,8 +131,121 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 	const [tagModalOpen, setTagModalOpen] = useState(false);
 	const [tagInput, setTagInput] = useState("");
 	const [tagging, setTagging] = useState(false);
+	const [previewItem, setPreviewItem] = useState<(typeof items)[0] | null>(null);
+	const [editItem, setEditItem] = useState<(typeof items)[0] | null>(null);
+	const [settingHero, setSettingHero] = useState<string | null>(null);
+	const [previewDescription, setPreviewDescription] = useState("");
+	const [previewTags, setPreviewTags] = useState<{ id: string; name: string }[]>([]);
+	const [previewSaving, setPreviewSaving] = useState(false);
+	const [previewTagInput, setPreviewTagInput] = useState("");
+	const [editCrop, setEditCrop] = useState<Record<string, { x: number; y: number }>>({});
+	const [editSaving, setEditSaving] = useState(false);
+	const [editVariant, setEditVariant] = useState<"thumb" | "grid" | "hero">("thumb");
+
+	const VARIANTS = [
+		{ id: "thumb" as const, label: "Thumbnail", w: 500, h: 500 },
+		{ id: "grid" as const, label: "Grid", w: 720, h: 720 },
+		{ id: "hero" as const, label: "Hero", w: 1920, h: 1080 },
+	];
+
+	useEffect(() => {
+		if (editItem) {
+			const defaultCrop = { thumb: { x: 0.5, y: 0.5 }, grid: { x: 0.5, y: 0.5 }, hero: { x: 0.5, y: 0.5 } };
+			let saved: Record<string, { x: number; y: number }> = defaultCrop;
+			if (editItem.meta) {
+				try {
+					const parsed = JSON.parse(editItem.meta) as { crop?: Record<string, { x: number; y: number }> };
+					if (parsed.crop && typeof parsed.crop === "object") {
+						saved = { ...defaultCrop, ...parsed.crop };
+					}
+				} catch {
+					// ignore invalid meta
+				}
+			}
+			setEditCrop(saved);
+			setEditVariant("thumb");
+		}
+	}, [editItem]);
+
+	async function savePreviewChanges() {
+		if (!previewItem) return;
+		setPreviewSaving(true);
+		try {
+			const [itemRes, tagsRes] = await Promise.all([
+				fetch(`/api/items/${previewItem.id}`, {
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ description: previewDescription }),
+				}),
+				fetch(`/api/items/${previewItem.id}/tags`, {
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ tagNames: previewTags.map((t) => t.name) }),
+				}),
+			]);
+			if (itemRes.ok && tagsRes.ok) {
+				revalidator.revalidate();
+				setPreviewItem(null);
+			} else {
+				const err = (await itemRes.json()) as { error?: string };
+				alert(err.error ?? "Failed to save");
+			}
+		} finally {
+			setPreviewSaving(false);
+		}
+	}
+
+	function addPreviewTag() {
+		const name = previewTagInput.trim();
+		if (!name || previewTags.some((t) => t.name.toLowerCase() === name.toLowerCase())) return;
+		setPreviewTags((prev) => [...prev, { id: `new-${name}`, name }]);
+		setPreviewTagInput("");
+	}
+
+	function removePreviewTag(tagId: string) {
+		setPreviewTags((prev) => prev.filter((t) => t.id !== tagId));
+	}
+
+	async function saveEditCrop() {
+		if (!editItem) return;
+		setEditSaving(true);
+		try {
+			const res = await fetch(`/api/items/${editItem.id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ cropMeta: editCrop }),
+			});
+			if (res.ok) {
+				revalidator.revalidate();
+				setEditItem(null);
+			} else {
+				const data = (await res.json()) as { error?: string };
+				alert(data.error ?? "Failed to save crop");
+			}
+		} finally {
+			setEditSaving(false);
+		}
+	}
+
+	function updateCropFromEvent(
+		variant: "thumb" | "grid" | "hero",
+		e: { clientX: number; clientY: number },
+		el: HTMLElement,
+	) {
+		const rect = el.getBoundingClientRect();
+		const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+		const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+		setEditCrop((prev) => ({ ...prev, [variant]: { x, y } }));
+	}
 
 	const PP_PAGE_SIZE = 24;
+
+	useEffect(() => {
+		if (previewItem) {
+			setPreviewDescription(previewItem.description ?? "");
+			setPreviewTags(previewItem.tags ?? []);
+		}
+	}, [previewItem]);
 
 	useEffect(() => {
 		if (!photoprismOpen) return;
@@ -276,13 +407,33 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 		}
 	}
 
-	function toggleItemSelection(itemId: string) {
+	function toggleItemSelection(itemId: string, e?: React.MouseEvent) {
+		e?.stopPropagation();
 		setSelectedItemIds((prev) => {
 			const next = new Set(prev);
 			if (next.has(itemId)) next.delete(itemId);
 			else next.add(itemId);
 			return next;
 		});
+	}
+
+	async function handleSetHero(itemId: string, e: React.MouseEvent) {
+		e.stopPropagation();
+		setSettingHero(itemId);
+		try {
+			const res = await fetch(`/api/albums/${album.id}/cover`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ coverItemId: itemId }),
+			});
+			if (res.ok) revalidator.revalidate();
+			else {
+				const data = (await res.json()) as { error?: string };
+				alert(data.error ?? "Failed to set cover");
+			}
+		} finally {
+			setSettingHero(null);
+		}
 	}
 
 	async function handleTagSelected() {
@@ -521,6 +672,222 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 				</div>
 			)}
 
+			{previewItem && (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+					onClick={() => setPreviewItem(null)}
+				>
+					<div
+						className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+							<h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+								Photo preview
+							</h2>
+							<button
+								type="button"
+								onClick={() => setPreviewItem(null)}
+								className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl leading-none"
+							>
+								×
+							</button>
+						</div>
+						<div className="flex-1 overflow-auto flex flex-col md:flex-row gap-4 p-4">
+							<div className="flex-1 min-h-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg">
+								<img
+									src={previewItem.heroUrl ?? previewItem.gridUrl ?? previewItem.thumbUrl}
+									alt=""
+									className="max-w-full max-h-[60vh] object-contain"
+								/>
+							</div>
+							<div className="w-full md:w-80 space-y-4">
+								<div>
+									<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+										Description
+									</label>
+									<textarea
+										value={previewDescription}
+										onChange={(e) => setPreviewDescription(e.target.value)}
+										rows={3}
+										placeholder="Add a description…"
+										className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+									/>
+								</div>
+								<div>
+									<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+										Tags
+									</label>
+									<div className="flex gap-2 mb-2">
+										<input
+											type="text"
+											value={previewTagInput}
+											onChange={(e) => setPreviewTagInput(e.target.value)}
+											onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addPreviewTag())}
+											placeholder="Add tag…"
+											className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+										/>
+										<button
+											type="button"
+											onClick={addPreviewTag}
+											className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium text-sm"
+										>
+											Add
+										</button>
+									</div>
+									<div className="flex flex-wrap gap-2">
+										{previewTags.map((t) => (
+											<span
+												key={t.id}
+												className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm"
+											>
+												{t.name}
+												<button
+													type="button"
+													onClick={() => removePreviewTag(t.id)}
+													className="text-gray-500 hover:text-red-600"
+												>
+													×
+												</button>
+											</span>
+										))}
+									</div>
+								</div>
+							</div>
+						</div>
+						<div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+							<button
+								type="button"
+								onClick={() => setPreviewItem(null)}
+								className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={savePreviewChanges}
+								disabled={previewSaving}
+								className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
+							>
+								{previewSaving ? "Saving…" : "Save"}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{editItem && (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+					onClick={() => setEditItem(null)}
+				>
+					<div
+						className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+							<h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+								Edit crop
+							</h2>
+							<button
+								type="button"
+								onClick={() => setEditItem(null)}
+								className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl leading-none"
+							>
+								×
+							</button>
+						</div>
+						<div className="flex-1 overflow-auto flex flex-col md:flex-row gap-4 p-4">
+							<div className="flex flex-col gap-4">
+								<div className="flex gap-2">
+									{VARIANTS.map((v) => (
+										<button
+											key={v.id}
+											type="button"
+											onClick={() => setEditVariant(v.id)}
+											className={`px-3 py-2 rounded-lg text-sm font-medium ${
+												editVariant === v.id
+													? "bg-blue-600 text-white"
+													: "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+											}`}
+										>
+											{v.label} ({v.w}×{v.h})
+										</button>
+									))}
+								</div>
+								<div
+									className="relative bg-gray-900 rounded-lg overflow-hidden cursor-crosshair w-full max-w-lg mx-auto flex-shrink-0"
+									style={{
+										aspectRatio:
+											editVariant === "hero" ? "16/9" : "1",
+									}}
+									onMouseDown={(e) => {
+										if (e.button !== 0) return;
+										const el = e.currentTarget;
+										updateCropFromEvent(editVariant, e, el);
+										const onMove = (ev: MouseEvent) =>
+											updateCropFromEvent(editVariant, ev, el);
+										const onUp = () => {
+											document.removeEventListener("mousemove", onMove);
+											document.removeEventListener("mouseup", onUp);
+										};
+										document.addEventListener("mousemove", onMove);
+										document.addEventListener("mouseup", onUp);
+									}}
+								>
+									<img
+										src={
+											editVariant === "thumb"
+												? editItem.thumbUrl
+												: editVariant === "grid"
+													? editItem.gridUrl
+													: editItem.heroUrl ?? editItem.gridUrl
+										}
+										alt=""
+										className="w-full h-full object-cover select-none pointer-events-none"
+										style={{
+											objectPosition: editCrop[editVariant]
+												? `${editCrop[editVariant].x * 100}% ${editCrop[editVariant].y * 100}%`
+												: "50% 50%",
+										}}
+									/>
+									{editCrop[editVariant] && (
+										<div
+											className="absolute w-4 h-4 border-2 border-white rounded-full pointer-events-none shadow-lg"
+											style={{
+												left: `${editCrop[editVariant].x * 100}%`,
+												top: `${editCrop[editVariant].y * 100}%`,
+												transform: "translate(-50%, -50%)",
+											}}
+										/>
+									)}
+								</div>
+								<p className="text-sm text-gray-500 dark:text-gray-400">
+									Click and drag to set the focal point for this variant.
+								</p>
+							</div>
+						</div>
+						<div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+							<button
+								type="button"
+								onClick={() => setEditItem(null)}
+								className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={saveEditCrop}
+								disabled={editSaving}
+								className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
+							>
+								{editSaving ? "Saving…" : "Save"}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+
 			{tagModalOpen && (
 				<div
 					className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
@@ -597,15 +964,20 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 					)}
 					<ul className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
 						{items.map((item) => (
-							<li key={item.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
-								<button
-									type="button"
-									onClick={() => toggleItemSelection(item.id)}
-									className={`relative w-full h-full block text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg ${
-										selectedItemIds.has(item.id)
-											? "ring-2 ring-blue-500 ring-offset-2"
-											: "hover:ring-2 hover:ring-gray-400 hover:ring-offset-2"
-									}`}
+							<li
+								key={item.id}
+								className={`group aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 relative ${
+									selectedItemIds.has(item.id)
+										? "ring-2 ring-blue-500 ring-offset-2"
+										: "hover:ring-2 hover:ring-gray-400 hover:ring-offset-2"
+								} ${album.coverItemId === item.id ? "ring-2 ring-amber-500 ring-offset-2" : ""}`}
+							>
+								<div
+									role="button"
+									tabIndex={0}
+									onClick={() => setPreviewItem(item)}
+									onKeyDown={(e) => e.key === "Enter" && setPreviewItem(item)}
+									className="relative w-full h-full block text-left focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg cursor-pointer"
 								>
 									{item.thumbUrl ? (
 										<img
@@ -619,13 +991,63 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 											{item.imageId}
 										</div>
 									)}
+									{/* Hover overlay with action icons */}
+									<div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-lg">
+										<button
+											type="button"
+											onClick={(e) => toggleItemSelection(item.id, e)}
+											className={`w-9 h-9 rounded-full flex items-center justify-center text-white transition-colors ${
+												selectedItemIds.has(item.id)
+													? "bg-blue-500"
+													: "bg-white/30 hover:bg-white/50"
+											}`}
+											title="Select"
+										>
+											<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+											</svg>
+										</button>
+										<button
+											type="button"
+											onClick={(e) => {
+												e.stopPropagation();
+												setEditItem(item);
+											}}
+											className="w-9 h-9 rounded-full bg-white/30 hover:bg-white/50 flex items-center justify-center text-white transition-colors"
+											title="Edit crop"
+										>
+											<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+											</svg>
+										</button>
+										<button
+											type="button"
+											onClick={(e) => handleSetHero(item.id, e)}
+											disabled={settingHero === item.id}
+											className={`w-9 h-9 rounded-full flex items-center justify-center text-white transition-colors ${
+												album.coverItemId === item.id
+													? "bg-amber-500"
+													: "bg-white/30 hover:bg-white/50"
+											} disabled:opacity-50`}
+											title="Set as album cover"
+										>
+											<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+												<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+											</svg>
+										</button>
+									</div>
 									{selectedItemIds.has(item.id) && (
-										<span className="absolute top-2 right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
+										<span className="absolute top-2 right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium pointer-events-none">
 											✓
 										</span>
 									)}
+									{album.coverItemId === item.id && (
+										<span className="absolute top-2 left-2 w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-sm pointer-events-none">
+											★
+										</span>
+									)}
 									{item.tags && item.tags.length > 0 && (
-										<div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 p-2 bg-black/60">
+										<div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 p-2 bg-black/60 pointer-events-none">
 											{item.tags.map((t) => (
 												<span
 													key={t.id}
@@ -637,7 +1059,7 @@ export default function AlbumDetail({ loaderData }: Route.ComponentProps) {
 											))}
 										</div>
 									)}
-								</button>
+								</div>
 							</li>
 						))}
 					</ul>

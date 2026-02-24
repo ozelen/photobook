@@ -185,6 +185,7 @@ export async function updateAlbum(
 		description?: string;
 		model?: string;
 		isPublic?: boolean;
+		coverItemId?: string | null;
 	},
 ): Promise<Album | null> {
 	const existing = await getAlbum(db, id, ownerUserId);
@@ -195,13 +196,14 @@ export async function updateAlbum(
 	const isPublic = input.isPublic !== undefined ? (input.isPublic ? 1 : 0) : existing.isPublic;
 	const baseSlug = input.slug ?? slugify(input.name ?? existing.name);
 	const slug = await ensureUniqueSlug(db, ownerUserId, baseSlug, id);
+	const coverItemId = input.coverItemId !== undefined ? input.coverItemId : existing.coverItemId;
 	const newVersion = existing.publicVersion + 1;
 	const now = new Date().toISOString();
 
 	await db.batch([
 		db
 			.prepare(
-				`UPDATE albums SET name = ?, slug = ?, kind = ?, description = ?, model = ?, is_public = ?, public_version = ?, updated_at = ?
+				`UPDATE albums SET name = ?, slug = ?, kind = ?, description = ?, model = ?, is_public = ?, cover_item_id = ?, public_version = ?, updated_at = ?
          WHERE id = ? AND owner_user_id = ?`,
 			)
 			.bind(
@@ -211,6 +213,7 @@ export async function updateAlbum(
 				input.description ?? existing.description,
 				input.model ?? existing.model,
 				isPublic,
+				coverItemId ?? null,
 				newVersion,
 				now,
 				id,
@@ -221,7 +224,7 @@ export async function updateAlbum(
 			"album",
 			id,
 			"upsert",
-			JSON.stringify({ id, slug, name, kind, isPublic }),
+			JSON.stringify({ id, slug, name, kind, isPublic, coverItemId }),
 			newVersion,
 		),
 	]);

@@ -5,6 +5,9 @@ export interface AlbumItem {
 	imageId: string;
 	sortOrder: number;
 	createdAt: string;
+	title: string | null;
+	description: string | null;
+	meta: string | null;
 }
 
 export async function listAlbumItems(
@@ -14,7 +17,8 @@ export async function listAlbumItems(
 ): Promise<AlbumItem[]> {
 	const { results } = await db
 		.prepare(
-			`SELECT i.id, i.image_id as imageId, ai.sort_order as sortOrder, ai.created_at as createdAt
+			`SELECT i.id, i.image_id as imageId, ai.sort_order as sortOrder, ai.created_at as createdAt,
+        i.title, i.description, i.meta
        FROM album_items ai
        JOIN items i ON i.id = ai.item_id
        WHERE ai.album_id = ? AND i.owner_user_id = ? AND i.image_id IS NOT NULL AND i.deleted_at IS NULL
@@ -22,7 +26,49 @@ export async function listAlbumItems(
 		)
 		.bind(albumId, ownerUserId)
 		.all();
-	return (results ?? []) as AlbumItem[];
+	return (results ?? []) as unknown as AlbumItem[];
+}
+
+export async function updateItem(
+	db: D1Database,
+	itemId: string,
+	ownerUserId: string,
+	input: {
+		title?: string | null;
+		description?: string | null;
+		cropMeta?: Record<string, { x: number; y: number }> | null;
+	},
+): Promise<boolean> {
+	const updates: string[] = ["updated_at = ?"];
+	const bindings: unknown[] = [new Date().toISOString()];
+	if (input.title !== undefined) {
+		updates.push("title = ?");
+		bindings.push(input.title);
+	}
+	if (input.description !== undefined) {
+		updates.push("description = ?");
+		bindings.push(input.description);
+	}
+	if (input.cropMeta !== undefined) {
+		const existing = await db
+			.prepare("SELECT meta FROM items WHERE id = ? AND owner_user_id = ?")
+			.bind(itemId, ownerUserId)
+			.first();
+		const meta = (existing as { meta: string | null } | null)?.meta;
+		const parsed = meta ? (JSON.parse(meta) as Record<string, unknown>) : {};
+		parsed.crop = input.cropMeta;
+		updates.push("meta = ?");
+		bindings.push(JSON.stringify(parsed));
+	}
+	bindings.push(itemId, ownerUserId);
+	const result = await db
+		.prepare(
+			`UPDATE items SET ${updates.join(", ")} WHERE id = ? AND owner_user_id = ?`,
+		)
+		.bind(...bindings)
+		.run();
+	const meta = result.meta as { changes?: number } | undefined;
+	return (meta?.changes ?? 0) > 0;
 }
 
 export async function isItemInPublicAlbum(
