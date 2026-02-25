@@ -49,11 +49,12 @@ export async function fetchItemImage(
 				WEBDAV_PASSWORD,
 				{ count: 1 },
 			);
+			// Use fit_1920 for raw image so hero (1920x1080) is downscaled, not upscaled
 			const thumbUrl = getPhotoPrismThumbnailUrl(
 				PHOTOPRISM_BASE_URL,
 				hash,
 				previewToken,
-				"fit_720",
+				"fit_1920",
 			);
 			let thumbRes = await fetch(thumbUrl, { headers: { Accept: "image/*" } });
 			if (!thumbRes.ok) {

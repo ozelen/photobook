@@ -10,7 +10,7 @@ export type ImageVariant = "thumb" | "grid" | "hero";
 const VARIANT_OPTIONS: Record<ImageVariant, string> = {
 	thumb: "width=500,height=500,fit=cover,quality=85",
 	grid: "width=720,height=720,fit=inside,quality=85",
-	hero: "width=1920,height=1080,fit=cover,quality=85",
+	hero: "width=1920,height=1080,fit=cover,quality=90",
 };
 
 const VARIANT_DIMENSIONS: Record<ImageVariant, { w: number; h: number }> = {
