@@ -122,12 +122,25 @@ hr {
 	animation: hero-image-fade-in 0.5s ease-out forwards;
 }
 
+.hero-image-slide-up {
+	animation: hero-slide-up 0.4s ease-out forwards;
+}
+
 @keyframes hero-image-fade-in {
 	from {
 		opacity: 0;
 	}
 	to {
 		opacity: 1;
+	}
+}
+
+@keyframes hero-slide-up {
+	from {
+		transform: translateY(100%);
+	}
+	to {
+		transform: translateY(0);
 	}
 }
 
@@ -157,8 +170,8 @@ hr {
 
 /* Hero picker wheel */
 .hero-picker-wrap {
-	height: 7rem;
-	width: 12rem;
+	height: 8.5rem;
+	width: 14rem;
 	overflow: hidden;
 	mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
 	-webkit-mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
@@ -168,7 +181,7 @@ hr {
 	width: 100%;
 	overflow-y: auto;
 	overflow-x: hidden;
-	scroll-snap-type: y mandatory;
+	touch-action: none;
 	scrollbar-width: none;
 	-ms-overflow-style: none;
 	padding: 2.5rem 0;
@@ -177,21 +190,20 @@ hr {
 	display: none;
 }
 .hero-picker-item {
-	scroll-snap-align: center;
-	scroll-snap-stop: always;
-	height: 2.25rem;
+	height: 2.5rem;
 	width: 100%;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	text-align: center;
-	font-size: 1.125rem;
+	font-size: 1.25rem;
 	font-weight: 500;
+	color: white;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.6);
 	transition: opacity 0.2s ease, transform 0.2s ease;
 	transform-origin: center center;
 	cursor: pointer;
 	text-decoration: none;
-	color: inherit;
 }
 .hero-picker-item:hover {
 	opacity: 1;
