@@ -49,6 +49,12 @@ a {
 a:hover {
 	color: var(--accent);
 }
+#gallery a:not(.gallery-tag-link) {
+	color: #1c1917;
+}
+#gallery a:not(.gallery-tag-link):hover {
+	color: #292524;
+}
 p {
 	margin-bottom: 1em;
 }

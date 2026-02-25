@@ -53,8 +53,8 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 >
 	<div class="max-w-7xl mx-auto w-full">
 		<div class="text-center mb-12">
-			<h2 class="font-serif text-4xl sm:text-5xl font-light text-stone-900">Gallery</h2>
-			<p class="mt-4 text-stone-600 max-w-2xl mx-auto">
+			<h2 id="gallery-title" class="font-serif text-4xl sm:text-5xl font-light text-stone-900">Gallery</h2>
+			<p id="gallery-subtitle" class="mt-4 text-stone-600 max-w-2xl mx-auto">
 				A curated collection of moments frozen in time, each telling a unique story through light and shadow.
 			</p>
 		</div>
@@ -682,6 +682,15 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 				.then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load gallery'))))
 				.then(async (data) => {
 					const { galleryItems = [], topTags = [], heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt } = data;
+					const galleryTitleEl = document.getElementById('gallery-title');
+					const gallerySubtitleEl = document.getElementById('gallery-subtitle');
+					if (galleryTitleEl) {
+						const tagInfo = tag ? topTags.find((t) => t.slug === tag) : null;
+						galleryTitleEl.textContent = tagInfo ? tagInfo.name : 'Gallery';
+					}
+					if (gallerySubtitleEl) {
+						gallerySubtitleEl.textContent = apiHeroSubtitle ?? 'A curated collection of moments frozen in time, each telling a unique story through light and shadow.';
+					}
 					if (loadingEl) loadingEl.classList.add('hidden');
 					const defaultData = tag ? await fetch('/api/gallery.json').then((r) => (r.ok ? r.json() : null)) : data;
 					const tagSlides = await Promise.all(
@@ -762,6 +771,17 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 							l.classList.toggle('text-stone-700', !isActive);
 							l.classList.toggle('border-stone-300', !isActive);
 						});
+					}
+					// Scroll active tag into center
+					if (tagContainer) {
+						const activeLink = Array.from(tagContainer.querySelectorAll('.gallery-tag-link')).find((l) => {
+							const href = l.getAttribute('href') || '';
+							const lTag = href === '/gallery' ? '' : href.replace(/^\/gallery\//, '').split('/')[0];
+							return lTag === tag;
+						});
+						if (activeLink) {
+							activeLink.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+						}
 					}
 					if (gridEl) {
 						gridEl.innerHTML = galleryItems
