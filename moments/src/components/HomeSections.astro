@@ -338,7 +338,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 
 		const PICKER_ITEM_HEIGHT = 40;
 		const PICKER_PADDING = 40;
-		const PICKER_LANDING_MS = 350;
+		const PICKER_LANDING_MS = 1200;
 		let pickerIsJumping = false;
 		let pickerLandingUntil = 0;
 
@@ -578,8 +578,12 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			if (!heroSectionInView || heroSlides.length <= 1) return;
 			if (Date.now() < pickerLandingUntil) {
 				e.preventDefault();
+				e.stopPropagation();
 				return;
 			}
+			pickerLandingUntil = Date.now() + PICKER_LANDING_MS;
+			e.preventDefault();
+			e.stopPropagation();
 			stopCarousel();
 			clearTimeout(carouselResumeId);
 			if (e.deltaY > 0) advanceCarousel();
@@ -587,8 +591,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			carouselResumeId = setTimeout(() => {
 				if (heroSectionInView && heroSlides.length > 1) startCarousel();
 			}, CAROUSEL_RESUME_DELAY_MS);
-			e.preventDefault();
-		}, { passive: false });
+		}, { passive: false, capture: true });
 
 		let touchStartY = 0;
 		let touchAdvanced = false;
