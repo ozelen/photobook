@@ -37,21 +37,28 @@ const navLinks = [
 		type="button"
 		id="menu-btn"
 		class:list={[
-			"menu-btn p-2 -mr-2 transition-colors",
+			"menu-btn relative p-2 -mr-2 transition-colors",
 			horizontalScroll ? "text-white hover:text-white/90" : "text-stone-900 hover:text-stone-700",
 		]}
 		aria-label="Open menu"
 		aria-expanded="false"
 		aria-controls="overlay-menu"
 	>
-		<svg class="w-6 h-6 menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<svg class="menu-icon w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 		</svg>
-		<svg class="w-6 h-6 menu-close hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<svg class="menu-close w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 		</svg>
 	</button>
 </header>
+
+<style>
+	.menu-btn .menu-icon { display: block; }
+	.menu-btn .menu-close { display: none; }
+	.menu-btn[aria-expanded="true"] .menu-icon { display: none; }
+	.menu-btn[aria-expanded="true"] .menu-close { display: block; }
+</style>
 
 <div
 	id="overlay-menu"
@@ -63,15 +70,6 @@ const navLinks = [
 		class="absolute inset-0 bg-stone-900/98 backdrop-blur-md"
 		aria-hidden="true"
 	></div>
-	<button
-		type="button"
-		class="overlay-close absolute top-4 right-4 z-10 p-2 text-white hover:text-white/90"
-		aria-label="Close menu"
-	>
-		<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-		</svg>
-	</button>
 	<div class="overlay-content relative z-10 flex flex-col items-center justify-center min-h-full gap-8 py-24 pointer-events-none [&_a]:pointer-events-auto">
 		{navLinks.map((l) =>
 			horizontalScroll ? (
@@ -93,15 +91,12 @@ const navLinks = [
 <script>
 	const menuBtn = document.getElementById('menu-btn');
 	const menu = document.getElementById('overlay-menu');
-	const overlayClose = document.querySelector('.overlay-close');
 
 	function openMenu() {
 		menu?.classList.remove('opacity-0', 'invisible');
 		menu?.setAttribute('aria-hidden', 'false');
 		menuBtn?.setAttribute('aria-label', 'Close menu');
 		menuBtn?.setAttribute('aria-expanded', 'true');
-		menuBtn?.querySelector('.menu-icon')?.classList.add('hidden');
-		menuBtn?.querySelector('.menu-close')?.classList.remove('hidden');
 		document.body.classList.add('menu-open');
 		document.body.style.overflow = 'hidden';
 	}
@@ -111,8 +106,6 @@ const navLinks = [
 		menu?.setAttribute('aria-hidden', 'true');
 		menuBtn?.setAttribute('aria-label', 'Open menu');
 		menuBtn?.setAttribute('aria-expanded', 'false');
-		menuBtn?.querySelector('.menu-icon')?.classList.remove('hidden');
-		menuBtn?.querySelector('.menu-close')?.classList.add('hidden');
 		document.body.classList.remove('menu-open');
 		document.body.style.overflow = '';
 	}
@@ -121,8 +114,6 @@ const navLinks = [
 		if (menu?.classList.contains('invisible')) openMenu();
 		else closeMenu();
 	});
-
-	overlayClose?.addEventListener('click', closeMenu);
 
 	document.getElementById('overlay-backdrop')?.addEventListener('click', closeMenu);
 
