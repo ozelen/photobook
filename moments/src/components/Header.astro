@@ -1,5 +1,4 @@
 ---
-import HeaderLink from "./HeaderLink.astro";
 import { SITE_TITLE } from "../consts";
 
 interface Props {
@@ -7,51 +6,131 @@ interface Props {
 	currentPath?: string;
 }
 
-const { horizontalScroll = false, currentPath } = Astro.props;
-const path = currentPath ?? Astro.url.pathname;
+const { horizontalScroll = false } = Astro.props;
 
-function isActive(path: string, current: string): boolean {
-	if (path === "/") return current === "/" || current === "";
-	return current.startsWith(path) && (path === current || current[path.length] === "/");
-}
+const navLinks = [
+	{ href: "/", label: "Home" },
+	{ href: "/gallery", label: "Gallery" },
+	{ href: "/services", label: "Services" },
+	{ href: "/contact", label: "Contact" },
+	{ href: "/about", label: "About" },
+];
 ---
 
-<header class="fixed top-0 left-0 right-0 z-50 bg-stone-50/95 backdrop-blur-sm border-b border-stone-200/80">
-	<nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-		<a href="/" class="font-serif text-xl font-semibold text-stone-900 hover:text-stone-700 transition-colors">
-			{SITE_TITLE}
-		</a>
-		<div class="flex items-center gap-8">
-			{horizontalScroll ? (
-				<>
-					<a href="/" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
-						Home
-					</a>
-					<a href="/gallery" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
-						Gallery
-					</a>
-					<a href="/services" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
-						Services
-					</a>
-					<a href="/contact" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
-						Contact
-					</a>
-					<a href="/about" class="nav-scroll-link text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium no-underline">
-						About
-					</a>
-				</>
-			) : (
-				<>
-					<HeaderLink href="/">Home</HeaderLink>
-					<HeaderLink href="/gallery">Gallery</HeaderLink>
-					<HeaderLink href="/services">Services</HeaderLink>
-					<HeaderLink href="/about" class:list={[{ "text-stone-900 font-semibold": isActive("/about", path) }]}>
-						About
-					</HeaderLink>
-					<HeaderLink href="/contact">Contact</HeaderLink>
-				</>
-			)}
-			<HeaderLink href="/blog">Blog</HeaderLink>
-		</div>
-	</nav>
+<header
+	id="main-header"
+	class:list={[
+		"header-minimal fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4 flex items-center justify-between",
+		horizontalScroll ? "text-white" : "text-stone-900",
+	]}
+>
+	<a
+		href="/"
+		class:list={[
+			"header-logo font-serif text-xl font-semibold transition-colors",
+			horizontalScroll ? "text-white hover:text-white/90" : "text-stone-900 hover:text-stone-700",
+		]}
+	>
+		{SITE_TITLE}
+	</a>
+	<button
+		type="button"
+		id="menu-btn"
+		class:list={[
+			"menu-btn p-2 -mr-2 transition-colors",
+			horizontalScroll ? "text-white hover:text-white/90" : "text-stone-900 hover:text-stone-700",
+		]}
+		aria-label="Open menu"
+		aria-expanded="false"
+		aria-controls="overlay-menu"
+	>
+		<svg class="w-6 h-6 menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+		</svg>
+		<svg class="w-6 h-6 menu-close hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+		</svg>
+	</button>
 </header>
+
+<div
+	id="overlay-menu"
+	class="overlay-menu fixed inset-0 z-40 opacity-0 invisible transition-all duration-300"
+	aria-hidden="true"
+>
+	<div
+		id="overlay-backdrop"
+		class="absolute inset-0 bg-stone-900/98 backdrop-blur-md"
+		aria-hidden="true"
+	></div>
+	<button
+		type="button"
+		class="overlay-close absolute top-4 right-4 z-10 p-2 text-white hover:text-white/90"
+		aria-label="Close menu"
+	>
+		<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+		</svg>
+	</button>
+	<div class="overlay-content relative z-10 flex flex-col items-center justify-center min-h-full gap-8 py-24 pointer-events-none [&_a]:pointer-events-auto">
+		{navLinks.map((l) =>
+			horizontalScroll ? (
+				<a href={l.href} class="nav-scroll-link text-2xl font-medium text-white hover:text-stone-200 no-underline">
+					{l.label}
+				</a>
+			) : (
+				<a href={l.href} class="text-2xl font-medium text-white hover:text-stone-200 no-underline">
+					{l.label}
+				</a>
+			)
+		)}
+		<a href="/blog" class="text-2xl font-medium text-white hover:text-stone-200 no-underline">
+			Blog
+		</a>
+	</div>
+</div>
+
+<script>
+	const menuBtn = document.getElementById('menu-btn');
+	const menu = document.getElementById('overlay-menu');
+	const overlayClose = document.querySelector('.overlay-close');
+
+	function openMenu() {
+		menu?.classList.remove('opacity-0', 'invisible');
+		menu?.setAttribute('aria-hidden', 'false');
+		menuBtn?.setAttribute('aria-label', 'Close menu');
+		menuBtn?.setAttribute('aria-expanded', 'true');
+		menuBtn?.querySelector('.menu-icon')?.classList.add('hidden');
+		menuBtn?.querySelector('.menu-close')?.classList.remove('hidden');
+		document.body.classList.add('menu-open');
+		document.body.style.overflow = 'hidden';
+	}
+
+	function closeMenu() {
+		menu?.classList.add('opacity-0', 'invisible');
+		menu?.setAttribute('aria-hidden', 'true');
+		menuBtn?.setAttribute('aria-label', 'Open menu');
+		menuBtn?.setAttribute('aria-expanded', 'false');
+		menuBtn?.querySelector('.menu-icon')?.classList.remove('hidden');
+		menuBtn?.querySelector('.menu-close')?.classList.add('hidden');
+		document.body.classList.remove('menu-open');
+		document.body.style.overflow = '';
+	}
+
+	menuBtn?.addEventListener('click', () => {
+		if (menu?.classList.contains('invisible')) openMenu();
+		else closeMenu();
+	});
+
+	overlayClose?.addEventListener('click', closeMenu);
+
+	document.getElementById('overlay-backdrop')?.addEventListener('click', closeMenu);
+
+	menu?.querySelectorAll('a').forEach((link) => {
+		link.addEventListener('click', closeMenu);
+	});
+
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') closeMenu();
+	});
+</script>

@@ -101,6 +101,19 @@ hr {
 	}
 }
 
+/* Mobile: hero fills space, touch for picker */
+@media (max-width: 767px) {
+	#hero {
+		touch-action: pan-x;
+	}
+}
+
+/* Header: transparent, no white areas */
+.header-minimal {
+	background: transparent;
+	border: none;
+}
+
 .nav-active {
 	color: #1c1917;
 	font-weight: 600;
@@ -122,10 +135,6 @@ hr {
 	animation: hero-image-fade-in 0.5s ease-out forwards;
 }
 
-.hero-image-slide-up {
-	animation: hero-slide-up 0.4s ease-out forwards;
-}
-
 @keyframes hero-image-fade-in {
 	from {
 		opacity: 0;
@@ -142,6 +151,28 @@ hr {
 	to {
 		transform: translateY(0);
 	}
+}
+
+@keyframes hero-slide-down {
+	from {
+		transform: translateY(-100%);
+	}
+	to {
+		transform: translateY(0);
+	}
+}
+
+.hero-image-slide-up {
+	animation: hero-slide-up 0.45s ease-out forwards;
+}
+
+.hero-image-slide-down {
+	animation: hero-slide-down 0.45s ease-out forwards;
+}
+
+.hero-image-base {
+	position: absolute;
+	inset: 0;
 }
 
 @keyframes section-fade-in {

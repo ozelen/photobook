@@ -433,8 +433,10 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			updatePickerFromScroll();
 			const slide = heroSlides[idx];
 			if (slide && (slide.slug ?? '') !== currentHeroTag) {
+				const prevIdx = heroSlides.findIndex((s) => (s.slug ?? '') === currentHeroTag);
+				const direction = prevIdx >= 0 && idx < prevIdx ? 'prev' : 'next';
 				currentHeroTag = slide.slug ?? '';
-				applyHeroSlide(slide);
+				applyHeroSlide(slide, direction);
 			}
 		});
 
@@ -475,7 +477,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			loadGallery(tag);
 		});
 
-		function applyHeroSlide(slide) {
+		function applyHeroSlide(slide, direction) {
 			if (!slide) return;
 			const { heroTitle, heroSubtitle, heroImageUrl, heroImageAlt } = slide;
 			const wrap = document.getElementById('hero-image-wrap');
@@ -483,6 +485,8 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			const heroTitleEl = document.getElementById('hero-title');
 			const heroSubtitleEl = document.getElementById('hero-subtitle');
 			const heroTextWrap = document.getElementById('hero-text-wrap');
+			const isNext = direction !== 'prev';
+
 			if (heroTextWrap) heroTextWrap.style.opacity = '0';
 			setTimeout(() => {
 				if (heroTitleEl && heroTitle) {
@@ -494,9 +498,27 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 				if (heroSubtitleEl && heroSubtitle) heroSubtitleEl.textContent = heroSubtitle;
 				if (heroTextWrap) heroTextWrap.style.opacity = '1';
 			}, 150);
+
 			if (wrap) {
+				const slideClass = isNext ? 'hero-image-slide-up' : 'hero-image-slide-down';
 				if (heroImageUrl) {
-					wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover hero-image-slide-up" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
+					const baseLayer = wrap.querySelector('.hero-image-base');
+					const incomingHtml = `<div class="hero-image-incoming absolute inset-0 z-10"><img src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover ${slideClass}" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
+
+					if (baseLayer) {
+						wrap.insertAdjacentHTML('beforeend', incomingHtml);
+						const incoming = wrap.querySelector('.hero-image-incoming');
+						const img = incoming?.querySelector('img');
+						img?.addEventListener('animationend', () => {
+							baseLayer.remove();
+							incoming?.classList.remove('hero-image-incoming');
+							incoming?.classList.add('hero-image-base');
+							incoming?.classList.remove('absolute', 'z-10');
+						}, { once: true });
+					} else {
+						wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover ${slideClass}" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
+					}
+
 					if (heroContent) {
 						heroContent.classList.add('text-white');
 						heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');
@@ -522,7 +544,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			const nextIdx = (currentIdx + 1) % heroSlides.length;
 			const nextSlide = heroSlides[nextIdx];
 			currentHeroTag = nextSlide.slug;
-			applyHeroSlide(nextSlide);
+			applyHeroSlide(nextSlide, 'next');
 		}
 
 		function prevSlide() {
@@ -531,7 +553,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			const prevIdx = currentIdx <= 0 ? heroSlides.length - 1 : currentIdx - 1;
 			const slide = heroSlides[prevIdx];
 			currentHeroTag = slide.slug;
-			applyHeroSlide(slide);
+			applyHeroSlide(slide, 'prev');
 		}
 
 		function startCarousel() {
@@ -575,6 +597,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 		let carouselResumeId = 0;
 		const CAROUSEL_RESUME_DELAY_MS = 3000;
 		document.addEventListener('wheel', (e) => {
+			if (document.body.classList.contains('menu-open')) return;
 			if (!heroSectionInView || heroSlides.length <= 1) return;
 			if (Date.now() < pickerLandingUntil) {
 				e.preventDefault();
@@ -596,12 +619,15 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 		let touchStartY = 0;
 		let touchAdvanced = false;
 		const TOUCH_THRESHOLD = 40;
-		document.getElementById('hero-picker-wrap')?.addEventListener('touchstart', (e) => {
+		const heroEl = document.getElementById('hero');
+		heroEl?.addEventListener('touchstart', (e) => {
+			if (document.body.classList.contains('menu-open')) return;
 			touchStartY = e.touches[0].clientY;
 			touchAdvanced = false;
 		}, { passive: true });
-		document.getElementById('hero-picker-wrap')?.addEventListener('touchmove', (e) => {
-			if (!heroSlides.length || heroSlides.length <= 1) return;
+		heroEl?.addEventListener('touchmove', (e) => {
+			if (document.body.classList.contains('menu-open')) return;
+			if (!heroSectionInView || !heroSlides.length || heroSlides.length <= 1) return;
 			if (Date.now() < pickerLandingUntil) {
 				e.preventDefault();
 				return;
@@ -692,7 +718,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 					}
 					if (wrap) {
 						if (displayUrl) {
-							wrap.innerHTML = `<img id="hero-image" src="${escapeHtml(displayUrl)}" alt="${escapeHtml(displayAlt || '')}" class="w-full h-full object-cover hero-image-slide-up" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div>`;
+							wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(displayUrl)}" alt="${escapeHtml(displayAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
 							if (heroContent) {
 								heroContent.classList.add('text-white');
 								heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');
