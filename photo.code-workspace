@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"sqltools.connections": [
+			{
+				"previewLimit": 50,
+				"driver": "SQLite",
+				"name": "db",
+				"database": "./moments/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/2d2e7ead9b179f90c95276ddd4778b351d646f85740a002642b94dadc2990d78.sqlite"
+			}
+		]
+	}
+}
