@@ -222,6 +222,8 @@ hr {
 	scrollbar-width: none;
 	-ms-overflow-style: none;
 	padding: 2.5rem 0;
+	scroll-behavior: smooth;
+	scroll-snap-type: y mandatory;
 }
 .hero-picker::-webkit-scrollbar {
 	display: none;
@@ -241,6 +243,7 @@ hr {
 	transform-origin: center center;
 	cursor: pointer;
 	text-decoration: none;
+	scroll-snap-align: center;
 }
 .hero-picker-item:hover {
 	opacity: 1;

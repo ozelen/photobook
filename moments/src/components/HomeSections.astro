@@ -394,20 +394,21 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 				pickerLandingUntil = Date.now() + PICKER_LANDING_MS;
 				const scrollToIdx = N + idx;
 				const targetTop = scrollToIdx * PICKER_ITEM_HEIGHT + PICKER_PADDING - (wrap.clientHeight / 2 - PICKER_ITEM_HEIGHT / 2);
-				picker.scrollTop = targetTop;
+				picker.scrollTo({ top: targetTop, behavior: 'smooth' });
 				updatePickerFromScroll();
-				requestAnimationFrame(() => {
+				setTimeout(() => {
 					pickerIsJumping = false;
 					updatePickerFromScroll();
-				});
+				}, PICKER_LANDING_MS);
 			}
 		}
 
 		document.getElementById('hero-picker')?.addEventListener('scroll', () => {
-			if (pickerIsJumping || Date.now() < pickerLandingUntil) return;
 			const wrap = document.getElementById('hero-picker-wrap');
 			const picker = document.getElementById('hero-picker');
 			if (!wrap || !picker || heroSlides.length === 0) return;
+			updatePickerFromScroll();
+			if (pickerIsJumping || Date.now() < pickerLandingUntil) return;
 			const N = heroSlides.length;
 			const center = wrap.clientHeight / 2;
 			const scrollCenter = picker.scrollTop + center;
@@ -430,7 +431,6 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 				idx = rawIdx - N;
 			}
 			idx = Math.max(0, Math.min(N - 1, idx));
-			updatePickerFromScroll();
 			const slide = heroSlides[idx];
 			if (slide && (slide.slug ?? '') !== currentHeroTag) {
 				const prevIdx = heroSlides.findIndex((s) => (s.slug ?? '') === currentHeroTag);
@@ -772,7 +772,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 							l.classList.toggle('border-stone-300', !isActive);
 						});
 					}
-					// Scroll active tag into center
+					// Scroll active tag into center within tag container only (avoid scrolling main)
 					if (tagContainer) {
 						const activeLink = Array.from(tagContainer.querySelectorAll('.gallery-tag-link')).find((l) => {
 							const href = l.getAttribute('href') || '';
@@ -780,7 +780,8 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 							return lTag === tag;
 						});
 						if (activeLink) {
-							activeLink.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+							const targetScroll = activeLink.offsetLeft - (tagContainer.clientWidth / 2) + (activeLink.offsetWidth / 2);
+							tagContainer.scrollTo({ left: Math.max(0, targetScroll), behavior: 'smooth' });
 						}
 					}
 					if (gridEl) {
