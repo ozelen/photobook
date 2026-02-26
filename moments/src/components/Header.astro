@@ -21,7 +21,8 @@ const navLinks = [
 	id="main-header"
 	class:list={[
 		"header-minimal fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4 flex items-center justify-between",
-		horizontalScroll ? "text-white" : "text-stone-900",
+		horizontalScroll && "text-white",
+		!horizontalScroll && "text-stone-900",
 	]}
 >
 	<a

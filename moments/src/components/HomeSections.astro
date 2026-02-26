@@ -248,8 +248,14 @@ const atLast = initialSection === 'about';
 	}
 
 	function scrollToSection(section, instant) {
+		const scrollEl = document.querySelector('main');
 		const el = document.getElementById(section);
-		if (el) el.scrollIntoView({ behavior: instant ? 'instant' : 'smooth', inline: 'start', block: 'nearest' });
+		if (scrollEl && el) {
+			const sectionWidth = scrollEl.scrollWidth / SECTIONS.length;
+			const idx = SECTIONS.indexOf(section);
+			const targetScrollLeft = idx >= 0 ? idx * sectionWidth : 0;
+			scrollEl.scrollTo({ left: targetScrollLeft, behavior: instant ? 'instant' : 'smooth' });
+		}
 		const path = sectionToPath(section);
 		if (location.pathname !== path) {
 			history.pushState({ section }, '', path);
@@ -310,6 +316,11 @@ const atLast = initialSection === 'about';
 		}
 
 		document.addEventListener('click', (e) => {
+			// Prevent gallery tag links from full navigation (handled by #gallery)
+			if (e.target?.closest?.('.gallery-tag-link')) {
+				e.preventDefault();
+				return;
+			}
 			const link = e.target?.closest?.('.scroll-to-btn, .nav-scroll-link');
 			if (!link) return;
 			const path = (link.getAttribute('href') || '/').split('?')[0];
@@ -489,9 +500,10 @@ const atLast = initialSection === 'about';
 			const link = e.target?.closest?.('.gallery-tag-link');
 			if (!link) return;
 			e.preventDefault();
+			scrollToSection('gallery', true);
 			const href = link.getAttribute('href') || '';
 			const tag = href === '/gallery' ? '' : href.replace(/^\/gallery\//, '').split('/')[0];
-			loadGallery(tag);
+			loadGallery(tag, { skipHeroUpdate: true });
 			const newPath = tag ? `/gallery/${tag}` : '/gallery';
 			history.pushState({ section: 'gallery', tag }, '', newPath);
 			link.closest('#gallery-tag-buttons')?.querySelectorAll('.gallery-tag-link').forEach((l) => {
@@ -708,7 +720,8 @@ const atLast = initialSection === 'about';
 			if (idx < SECTIONS.length - 1) scrollToSection(SECTIONS[idx + 1]);
 		});
 
-		function loadGallery(tag) {
+		function loadGallery(tag, opts = {}) {
+			const { skipHeroUpdate = false } = opts;
 			currentHeroTag = tag;
 			const url = tag ? `/api/gallery.json?tag=${encodeURIComponent(tag)}` : '/api/gallery.json';
 			const gridEl = document.getElementById('gallery-grid');
@@ -754,39 +767,41 @@ const atLast = initialSection === 'about';
 					if (heroSlides.length > 0 && !tag) {
 						currentHeroTag = heroSlides[0].slug ?? '';
 					}
-					const wrap = document.getElementById('hero-image-wrap');
-					const heroContent = document.getElementById('hero-content');
-					const heroTitleEl = document.getElementById('hero-title');
-					const heroSubtitleEl = document.getElementById('hero-subtitle');
-					if (heroTitleEl && displayTitle) {
-						const parts = String(displayTitle).split(' | ');
-						heroTitleEl.innerHTML = parts.length > 1
-							? escapeHtml(parts[0]) + '<br /><span class="italic">' + escapeHtml(parts.slice(1).join(' | ')) + '</span>'
-							: escapeHtml(displayTitle);
-					}
-					if (heroSubtitleEl && displaySubtitle) {
-						heroSubtitleEl.textContent = displaySubtitle;
-					}
-					if (wrap) {
-						if (displayUrl) {
-							wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(displayUrl)}" alt="${escapeHtml(displayAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
-							if (heroContent) {
-								heroContent.classList.add('text-white');
-								heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');
-								heroContent.querySelector('h1 span')?.classList.replace('text-stone-600', 'text-white/90');
-								heroContent.querySelector('p')?.classList.replace('text-stone-600', 'text-white/90');
-							}
-						} else {
-							wrap.innerHTML = '';
-							if (heroContent) {
-								heroContent.classList.remove('text-white');
-								heroContent.querySelector('h1')?.classList.replace('text-white', 'text-stone-900');
-								heroContent.querySelector('h1 span')?.classList.replace('text-white/90', 'text-stone-600');
-								heroContent.querySelector('p')?.classList.replace('text-white/90', 'text-stone-600');
+					if (!skipHeroUpdate) {
+						const wrap = document.getElementById('hero-image-wrap');
+						const heroContent = document.getElementById('hero-content');
+						const heroTitleEl = document.getElementById('hero-title');
+						const heroSubtitleEl = document.getElementById('hero-subtitle');
+						if (heroTitleEl && displayTitle) {
+							const parts = String(displayTitle).split(' | ');
+							heroTitleEl.innerHTML = parts.length > 1
+								? escapeHtml(parts[0]) + '<br /><span class="italic">' + escapeHtml(parts.slice(1).join(' | ')) + '</span>'
+								: escapeHtml(displayTitle);
+						}
+						if (heroSubtitleEl && displaySubtitle) {
+							heroSubtitleEl.textContent = displaySubtitle;
+						}
+						if (wrap) {
+							if (displayUrl) {
+								wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(displayUrl)}" alt="${escapeHtml(displayAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
+								if (heroContent) {
+									heroContent.classList.add('text-white');
+									heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');
+									heroContent.querySelector('h1 span')?.classList.replace('text-stone-600', 'text-white/90');
+									heroContent.querySelector('p')?.classList.replace('text-stone-600', 'text-white/90');
+								}
+							} else {
+								wrap.innerHTML = '';
+								if (heroContent) {
+									heroContent.classList.remove('text-white');
+									heroContent.querySelector('h1')?.classList.replace('text-white', 'text-stone-900');
+									heroContent.querySelector('h1 span')?.classList.replace('text-white/90', 'text-stone-600');
+									heroContent.querySelector('p')?.classList.replace('text-white/90', 'text-stone-600');
+								}
 							}
 						}
+						renderPicker(heroSlides, currentHeroTag);
 					}
-					renderPicker(heroSlides, currentHeroTag);
 					if (tagContainer && !tagContainer.innerHTML.trim() && (galleryItems.length > 0 || topTags.length > 0)) {
 						const currentTag = tag;
 						const allActive = !currentTag;
