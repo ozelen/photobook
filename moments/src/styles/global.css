@@ -102,9 +102,6 @@ hr {
 	body {
 		font-size: 18px;
 	}
-	main {
-		padding: 1em;
-	}
 }
 
 /* Mobile: hero fills space, touch for picker */
@@ -126,7 +123,19 @@ hr {
 }
 
 .section-nav-btn {
-	transition: opacity 0.3s ease, transform 0.3s ease, background-color 0.2s ease, color 0.2s ease;
+	transition: opacity 0.3s ease, transform 0.3s ease, background-color 0.2s ease, color 0.2s ease, flex 0.3s ease, min-width 0.3s ease, width 0.3s ease, max-width 0.3s ease, padding 0.3s ease, border-width 0.3s ease;
+}
+
+.section-nav-btn.section-nav-hidden {
+	flex: 0 0 0;
+	width: 0;
+	min-width: 0;
+	max-width: 0;
+	padding: 0;
+	border-width: 0;
+	overflow: hidden;
+	opacity: 0;
+	pointer-events: none;
 }
 
 .section-in-view {
