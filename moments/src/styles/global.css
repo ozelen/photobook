@@ -168,6 +168,15 @@ hr {
 	}
 }
 
+@keyframes hero-crossfade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
 .hero-image-slide-up {
 	animation: hero-slide-up 0.45s ease-out forwards;
 }
@@ -176,9 +185,17 @@ hr {
 	animation: hero-slide-down 0.45s ease-out forwards;
 }
 
+.hero-image-crossfade {
+	animation: hero-crossfade 0.4s ease-out forwards;
+}
+
 .hero-image-base {
 	position: absolute;
 	inset: 0;
+}
+
+#hero-image-wrap {
+	overflow: hidden;
 }
 
 @keyframes section-fade-in {

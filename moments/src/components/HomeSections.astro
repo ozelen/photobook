@@ -341,6 +341,13 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 		const PICKER_LANDING_MS = 1200;
 		let pickerIsJumping = false;
 		let pickerLandingUntil = 0;
+		let pickerRecycling = false;
+
+		function pickerItemHtml(s) {
+			const slug = s.slug ?? '';
+			const name = s.name ?? '';
+			return `<button type="button" role="option" class="hero-picker-item" data-hero-cta="tag" data-tag-slug="${escapeHtml(slug)}">${escapeHtml(name)}</button>`;
+		}
 
 		function renderPicker(slides, activeSlug) {
 			const wrap = document.getElementById('hero-picker-wrap');
@@ -351,13 +358,8 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 				picker.innerHTML = '';
 				return;
 			}
-			const tripled = [...slides, ...slides, ...slides];
-			const items = tripled.map((s) => {
-				const slug = s.slug ?? '';
-				const name = s.name ?? '';
-				return `<button type="button" role="option" class="hero-picker-item" data-hero-cta="tag" data-tag-slug="${escapeHtml(slug)}">${escapeHtml(name)}</button>`;
-			}).join('');
-			picker.innerHTML = items;
+			const initial = Array.from({ length: 15 }, () => slides).flat();
+			picker.innerHTML = initial.map(pickerItemHtml).join('');
 			const idx = slides.findIndex((s) => (s.slug ?? '') === activeSlug);
 			const startIdx = idx >= 0 ? idx : 0;
 			const scrollToIdx = N + startIdx;
@@ -383,23 +385,82 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			});
 		}
 
-		function scrollPickerToSlide(activeSlug) {
+		function scrollPickerToSlide(activeSlug, direction) {
 			const wrap = document.getElementById('hero-picker-wrap');
 			const picker = document.getElementById('hero-picker');
 			if (!wrap || !picker || heroSlides.length === 0) return;
 			const N = heroSlides.length;
-			const idx = heroSlides.findIndex((s) => (s.slug ?? '') === activeSlug);
-			if (idx >= 0) {
-				pickerIsJumping = true;
-				pickerLandingUntil = Date.now() + PICKER_LANDING_MS;
-				const scrollToIdx = N + idx;
-				const targetTop = scrollToIdx * PICKER_ITEM_HEIGHT + PICKER_PADDING - (wrap.clientHeight / 2 - PICKER_ITEM_HEIGHT / 2);
-				picker.scrollTo({ top: targetTop, behavior: 'smooth' });
+			const currentIdx = heroSlides.findIndex((s) => (s.slug ?? '') === currentHeroTag);
+			const targetIdx = heroSlides.findIndex((s) => (s.slug ?? '') === activeSlug);
+			const isLastToFirst = direction === 'next' && currentIdx === N - 1 && targetIdx === 0;
+			const isFirstToLast = direction === 'prev' && currentIdx === 0 && targetIdx === N - 1;
+			if (isLastToFirst) {
+				const toAdd = Array.from({ length: PICKER_CYCLES_PER_EXTEND }, () => heroSlides.map(pickerItemHtml).join('')).join('');
+				picker.insertAdjacentHTML('beforeend', toAdd);
+			} else if (isFirstToLast) {
+				const toAdd = Array.from({ length: PICKER_CYCLES_PER_EXTEND }, () => heroSlides.map(pickerItemHtml).join('')).join('');
+				picker.insertAdjacentHTML('afterbegin', toAdd);
+				picker.scrollTop += heroSlides.length * PICKER_CYCLES_PER_EXTEND * PICKER_ITEM_HEIGHT;
+			}
+			const matches = Array.from(picker.querySelectorAll(`.hero-picker-item[data-tag-slug="${CSS.escape(activeSlug)}"]`));
+			if (matches.length === 0) return;
+			const center = wrap.clientHeight / 2;
+			const scrollCenter = picker.scrollTop + center;
+			let target;
+			if (direction === 'next') {
+				target = matches.find((el) => el.offsetTop + PICKER_ITEM_HEIGHT / 2 >= scrollCenter) ?? matches[matches.length - 1];
+			} else {
+				target = [...matches].reverse().find((el) => el.offsetTop + PICKER_ITEM_HEIGHT / 2 <= scrollCenter) ?? matches[0];
+			}
+			pickerIsJumping = true;
+			pickerLandingUntil = Date.now() + PICKER_LANDING_MS;
+			target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			updatePickerFromScroll();
+			setTimeout(() => {
+				pickerIsJumping = false;
 				updatePickerFromScroll();
-				setTimeout(() => {
-					pickerIsJumping = false;
-					updatePickerFromScroll();
-				}, PICKER_LANDING_MS);
+			}, PICKER_LANDING_MS);
+		}
+
+		const PICKER_MAX_ITEMS = 300;
+		const PICKER_CYCLES_PER_EXTEND = 2;
+
+		function appendPickerCycles() {
+			const picker = document.getElementById('hero-picker');
+			if (!picker || heroSlides.length === 0 || pickerRecycling) return;
+			const itemCount = picker.querySelectorAll('.hero-picker-item').length;
+			const toAddCount = heroSlides.length * PICKER_CYCLES_PER_EXTEND;
+			if (itemCount + toAddCount > PICKER_MAX_ITEMS) return;
+			pickerRecycling = true;
+			const toAdd = Array.from({ length: PICKER_CYCLES_PER_EXTEND }, () => heroSlides.map(pickerItemHtml).join('')).join('');
+			picker.insertAdjacentHTML('beforeend', toAdd);
+			requestAnimationFrame(() => { pickerRecycling = false; });
+		}
+
+		function prependPickerCycles() {
+			const picker = document.getElementById('hero-picker');
+			if (!picker || heroSlides.length === 0 || pickerRecycling) return;
+			const itemCount = picker.querySelectorAll('.hero-picker-item').length;
+			const toAddCount = heroSlides.length * PICKER_CYCLES_PER_EXTEND;
+			if (itemCount + toAddCount > PICKER_MAX_ITEMS) return;
+			pickerRecycling = true;
+			const toAdd = Array.from({ length: PICKER_CYCLES_PER_EXTEND }, () => heroSlides.map(pickerItemHtml).join('')).join('');
+			picker.insertAdjacentHTML('afterbegin', toAdd);
+			picker.scrollTop += toAddCount * PICKER_ITEM_HEIGHT;
+			requestAnimationFrame(() => { pickerRecycling = false; });
+		}
+
+		function ensurePickerHasRoom() {
+			const wrap = document.getElementById('hero-picker-wrap');
+			const picker = document.getElementById('hero-picker');
+			if (!wrap || !picker || heroSlides.length === 0 || pickerIsJumping || Date.now() < pickerLandingUntil) return;
+			const viewportH = wrap.clientHeight;
+			const scrollH = picker.scrollHeight;
+			const threshold = viewportH * 2;
+			if (picker.scrollTop > scrollH - threshold - viewportH) {
+				appendPickerCycles();
+			} else if (picker.scrollTop < threshold) {
+				prependPickerCycles();
 			}
 		}
 
@@ -408,29 +469,14 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			const picker = document.getElementById('hero-picker');
 			if (!wrap || !picker || heroSlides.length === 0) return;
 			updatePickerFromScroll();
+			ensurePickerHasRoom();
 			if (pickerIsJumping || Date.now() < pickerLandingUntil) return;
 			const N = heroSlides.length;
 			const center = wrap.clientHeight / 2;
 			const scrollCenter = picker.scrollTop + center;
 			const rawIdxFloat = (scrollCenter - PICKER_PADDING - PICKER_ITEM_HEIGHT / 2) / PICKER_ITEM_HEIGHT;
 			const rawIdx = Math.round(rawIdxFloat);
-			let idx = rawIdx;
-			if (rawIdx < N) {
-				pickerIsJumping = true;
-				picker.scrollTop += N * PICKER_ITEM_HEIGHT;
-				idx = rawIdx;
-				requestAnimationFrame(() => { pickerIsJumping = false; });
-			} else if (rawIdx >= 2 * N || rawIdxFloat >= 2 * N - 0.5) {
-				pickerIsJumping = true;
-				const scrollToIdx = N;
-				const targetTop = scrollToIdx * PICKER_ITEM_HEIGHT + PICKER_PADDING - (wrap.clientHeight / 2 - PICKER_ITEM_HEIGHT / 2);
-				picker.scrollTop = targetTop;
-				idx = 0;
-				requestAnimationFrame(() => { pickerIsJumping = false; });
-			} else {
-				idx = rawIdx - N;
-			}
-			idx = Math.max(0, Math.min(N - 1, idx));
+			const idx = Math.max(0, Math.min(N - 1, rawIdx % N));
 			const slide = heroSlides[idx];
 			if (slide && (slide.slug ?? '') !== currentHeroTag) {
 				const prevIdx = heroSlides.findIndex((s) => (s.slug ?? '') === currentHeroTag);
@@ -485,7 +531,6 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			const heroTitleEl = document.getElementById('hero-title');
 			const heroSubtitleEl = document.getElementById('hero-subtitle');
 			const heroTextWrap = document.getElementById('hero-text-wrap');
-			const isNext = direction !== 'prev';
 
 			if (heroTextWrap) heroTextWrap.style.opacity = '0';
 			setTimeout(() => {
@@ -500,23 +545,21 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 			}, 150);
 
 			if (wrap) {
-				const slideClass = isNext ? 'hero-image-slide-up' : 'hero-image-slide-down';
 				if (heroImageUrl) {
 					const baseLayer = wrap.querySelector('.hero-image-base');
-					const incomingHtml = `<div class="hero-image-incoming absolute inset-0 z-10"><img src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover ${slideClass}" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
+					const incomingHtml = `<div class="hero-image-incoming hero-image-crossfade absolute inset-0 z-10"><img src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
 
 					if (baseLayer) {
 						wrap.insertAdjacentHTML('beforeend', incomingHtml);
 						const incoming = wrap.querySelector('.hero-image-incoming');
-						const img = incoming?.querySelector('img');
-						img?.addEventListener('animationend', () => {
+						incoming?.addEventListener('animationend', () => {
 							baseLayer.remove();
-							incoming?.classList.remove('hero-image-incoming');
+							incoming?.classList.remove('hero-image-incoming', 'hero-image-crossfade');
 							incoming?.classList.add('hero-image-base');
 							incoming?.classList.remove('absolute', 'z-10');
 						}, { once: true });
 					} else {
-						wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover ${slideClass}" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
+						wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
 					}
 
 					if (heroContent) {
@@ -535,7 +578,7 @@ const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Ast
 					}
 				}
 			}
-			scrollPickerToSlide(slide.slug ?? '');
+			scrollPickerToSlide(slide.slug ?? '', direction);
 		}
 
 		function advanceCarousel() {
