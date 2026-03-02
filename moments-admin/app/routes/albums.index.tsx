@@ -105,10 +105,18 @@ export default function AlbumsIndex({ loaderData }: Route.ComponentProps) {
 									<CardActions sx={{ p: 0, gap: 1 }}>
 										<Button
 											component={Link}
-											to={`/albums/${album.id}/edit`}
+											to={`/albums/${album.id}`}
 											size="small"
 										>
-											Edit
+											Edit photos
+										</Button>
+										<Button
+											component={Link}
+											to={`/albums/${album.id}/edit`}
+											size="small"
+											variant="text"
+										>
+											Album settings
 										</Button>
 										<Form method="post" action={`/albums/${album.id}`}>
 											<input type="hidden" name="_action" value="delete" />
