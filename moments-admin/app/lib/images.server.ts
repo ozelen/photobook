@@ -35,6 +35,13 @@ export function getCfImageUrl(
 	zoom = 1,
 ): string {
 	const base = origin.replace(/\/$/, "");
+
+	// In local development (localhost / 127.0.0.1), Cloudflare's /cdn-cgi/image
+	// route doesn't exist. Skip the resize proxy and hit the source URL directly.
+	if (base.includes("localhost") || base.includes("127.0.0.1")) {
+		return sourceUrl;
+	}
+
 	const dims = VARIANT_DIMENSIONS[variant];
 	const zw = Math.round(dims.w * zoom);
 	const zh = Math.round(dims.h * zoom);

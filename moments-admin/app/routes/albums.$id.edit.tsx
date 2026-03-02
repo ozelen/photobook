@@ -5,6 +5,21 @@ import { getSessionUser } from "../lib/auth.server";
 import { getAlbum, updateAlbum, isValidKind } from "../lib/albums.server";
 import { getTagsForEntity, setTagsForEntity } from "../lib/tags.server";
 import { slugify } from "../lib/slugify";
+import { listAlbumItems } from "../lib/items.server";
+import {
+	Box,
+	Button,
+	Card,
+	CardActionArea,
+	CardMedia,
+	Grid,
+	Stack,
+	TextField,
+	Typography,
+	FormControlLabel,
+	Checkbox,
+	MenuItem,
+} from "@mui/material";
 
 export function meta({ loaderData }: Route.MetaArgs) {
 	const album = loaderData?.album;
@@ -21,7 +36,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 	const album = await getAlbum(context.cloudflare.env.DB, params.id, user.id);
 	if (!album) throw new Response("Not found", { status: 404 });
 	const tags = await getTagsForEntity(context.cloudflare.env.DB, "album", params.id);
-	return { album, tags };
+	const items = await listAlbumItems(context.cloudflare.env.DB, params.id, user.id);
+	return { album, tags, items };
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
@@ -63,8 +79,8 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 }
 
 export default function AlbumEdit({ loaderData, actionData }: Route.ComponentProps) {
-	const { album, tags } = loaderData;
-	const slugRef = useRef<HTMLInputElement>(null);
+	const { album, tags, items } = loaderData;
+	const slugRef = useRef<HTMLInputElement | null>(null);
 
 	function handleNameInput(e: React.FormEvent<HTMLInputElement>) {
 		const name = (e.target as HTMLInputElement).value;
@@ -78,131 +94,145 @@ export default function AlbumEdit({ loaderData, actionData }: Route.ComponentPro
 	}
 
 	return (
-		<div>
-			<h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6">
+		<Box>
+			<Typography variant="h4" component="h1" gutterBottom>
 				Edit album
-			</h1>
-			<Form method="post" className="max-w-md space-y-4">
-				<div>
-					<label
-						htmlFor="name"
-						className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-					>
-						Name
-					</label>
-					<input
-						id="name"
-						name="name"
-						type="text"
-						defaultValue={album.name}
-						required
-						onInput={handleNameInput}
-						className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-					/>
-				</div>
-				<div>
-					<label
-						htmlFor="slug"
-						className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-					>
-						Slug (auto-generated from name, edit to override)
-					</label>
-					<input
-						ref={slugRef}
-						id="slug"
-						name="slug"
-						type="text"
-						defaultValue={album.slug}
-						onFocus={handleSlugFocus}
-						className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-					/>
-				</div>
-				<div>
-					<label
-						htmlFor="kind"
-						className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-					>
-						Kind
-					</label>
-					<select
-						id="kind"
-						name="kind"
-						defaultValue={album.kind}
-						className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-					>
-						<option value="portfolio">Portfolio</option>
-						<option value="client_delivery">Client delivery</option>
-					</select>
-				</div>
-				<div>
-					<label
-						htmlFor="description"
-						className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-					>
-						Description
-					</label>
-					<textarea
-						id="description"
-						name="description"
-						rows={3}
-						defaultValue={album.description ?? ""}
-						className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-					/>
-				</div>
-				<div>
-					<label
-						htmlFor="tags"
-						className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-					>
-						Tags
-					</label>
-					<input
-						id="tags"
-						name="tags"
-						type="text"
-						defaultValue={tags.map((t) => t.name).join(", ")}
-						placeholder="portrait, wedding, outdoors"
-						className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-					/>
-					<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-						Comma-separated. Tags are normalized and shared across albums and photos.
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					<input
-						id="isPublic"
-						name="isPublic"
-						type="checkbox"
-						defaultChecked={album.isPublic === 1}
-						className="rounded border-gray-300"
-					/>
-					<label
-						htmlFor="isPublic"
-						className="text-sm text-gray-700 dark:text-gray-300"
-					>
-						Public (visible on portfolio)
-					</label>
-				</div>
-				{actionData?.error && (
-					<p className="text-sm text-red-600 dark:text-red-400">
-						{actionData.error}
-					</p>
-				)}
-				<div className="flex gap-2">
-					<button
-						type="submit"
-						className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-					>
-						Save
-					</button>
-					<a
-						href={`/albums/${album.id}`}
-						className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-					>
-						Cancel
-					</a>
-				</div>
-			</Form>
-		</div>
+			</Typography>
+			<Grid container spacing={3}>
+				<Grid item xs={12} md={5} lg={4}>
+					<Form method="post">
+						<Stack spacing={2}>
+							<TextField
+								id="name"
+								name="name"
+								label="Name"
+								defaultValue={album.name}
+								required
+								fullWidth
+								onInput={handleNameInput}
+							/>
+							<TextField
+								id="slug"
+								name="slug"
+								label="Slug"
+								helperText="Auto-generated from name, edit to override."
+								defaultValue={album.slug}
+								fullWidth
+								onFocus={handleSlugFocus}
+								inputRef={slugRef}
+							/>
+							<TextField
+								select
+								id="kind"
+								name="kind"
+								label="Kind"
+								defaultValue={album.kind}
+								fullWidth
+							>
+								<MenuItem value="portfolio">Portfolio</MenuItem>
+								<MenuItem value="client_delivery">Client delivery</MenuItem>
+							</TextField>
+							<TextField
+								id="description"
+								name="description"
+								label="Description"
+								multiline
+								minRows={3}
+								defaultValue={album.description ?? ""}
+								fullWidth
+							/>
+							<TextField
+								id="tags"
+								name="tags"
+								label="Tags"
+								placeholder="portrait, wedding, outdoors"
+								defaultValue={tags.map((t) => t.name).join(", ")}
+								helperText="Comma-separated. Tags are normalized and shared across albums and photos."
+								fullWidth
+							/>
+							<FormControlLabel
+								control={
+									<Checkbox
+										id="isPublic"
+										name="isPublic"
+										defaultChecked={album.isPublic === 1}
+									/>
+								}
+								label="Public (visible on portfolio)"
+							/>
+							{actionData?.error && (
+								<Typography variant="body2" color="error">
+									{actionData.error}
+								</Typography>
+							)}
+							<Stack direction="row" spacing={2}>
+								<Button type="submit" variant="contained" color="primary">
+									Save
+								</Button>
+								<Button
+									component="a"
+									href={`/albums/${album.id}`}
+									variant="text"
+									color="inherit"
+								>
+									Cancel
+								</Button>
+							</Stack>
+						</Stack>
+					</Form>
+				</Grid>
+				<Grid item xs={12} md={7} lg={8}>
+					<Typography variant="subtitle1" gutterBottom>
+						Photos in this album
+					</Typography>
+					{items.length === 0 ? (
+						<Typography variant="body2" color="text.secondary">
+							No photos yet. Add photos on the album page.
+						</Typography>
+					) : (
+						<Box
+							sx={{
+								display: "grid",
+								gridTemplateColumns: {
+									xs: "repeat(2, minmax(0, 1fr))",
+									sm: "repeat(3, minmax(0, 1fr))",
+									md: "repeat(4, minmax(0, 1fr))",
+								},
+								gap: 2,
+							}}
+						>
+							{items.map((item: { id: string }) => (
+								<Card
+									key={item.id}
+									sx={{
+										borderRadius: 1.5,
+										overflow: "hidden",
+										bgcolor: "background.paper",
+										transition: "transform 200ms ease",
+										"&:hover": {
+											transform: "scale(1.03)",
+										},
+									}}
+								>
+									<CardActionArea>
+										<CardMedia
+											component="img"
+											image={`/api/items/${item.id}/image`}
+											alt=""
+											sx={{
+												width: "100%",
+												aspectRatio: "1 / 1",
+												objectFit: "cover",
+											}}
+											loading="lazy"
+										/>
+									</CardActionArea>
+								</Card>
+							))}
+						</Box>
+					)}
+				</Grid>
+			</Grid>
+		</Box>
 	);
 }

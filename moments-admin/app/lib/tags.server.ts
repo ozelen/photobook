@@ -15,6 +15,12 @@ export interface Tag {
 	heroItemId: string | null;
 }
 
+export interface TagItemPreview {
+	id: string;
+	imageId: string;
+	createdAt: string;
+}
+
 function toTag(row: Record<string, unknown>): Tag {
 	return {
 		id: row.id as string,
@@ -252,4 +258,57 @@ export async function getTagsForEntities(
 		});
 	}
 	return map;
+}
+
+export type DeleteTagStrategy = "untag" | "merge";
+
+export async function deleteTagWithStrategy(
+	db: D1Database,
+	tagId: string,
+	options: { strategy: DeleteTagStrategy; mergeTargetTagId?: string | null },
+): Promise<void> {
+	const strategy: DeleteTagStrategy =
+		options.strategy === "merge" ? "merge" : "untag";
+
+	if (strategy === "merge") {
+		const targetId = options.mergeTargetTagId ?? null;
+		if (!targetId || targetId === tagId) {
+			throw new Error("Invalid merge target tag");
+		}
+		// Reassign all tag_refs from the deleted tag to the target tag.
+		await db
+			.prepare("UPDATE tag_refs SET tag_id = ? WHERE tag_id = ?")
+			.bind(targetId, tagId)
+			.run();
+	} else {
+		// Remove tag_refs referencing this tag, leaving entities untagged.
+		await db
+			.prepare("DELETE FROM tag_refs WHERE tag_id = ?")
+			.bind(tagId)
+			.run();
+	}
+
+	// Finally, delete the tag itself.
+	await db.prepare("DELETE FROM tags WHERE id = ?").bind(tagId).run();
+}
+
+export async function listItemsForTag(
+	db: D1Database,
+	ownerUserId: string,
+	tagId: string,
+	limit = 6,
+): Promise<TagItemPreview[]> {
+	const { results } = await db
+		.prepare(
+			`SELECT i.id, i.image_id as imageId, tr.created_at as createdAt
+       FROM tag_refs tr
+       JOIN items i ON i.id = tr.entity_id
+       WHERE tr.tag_id = ? AND tr.entity_type = 'item'
+         AND i.owner_user_id = ? AND i.deleted_at IS NULL AND i.image_id IS NOT NULL
+       ORDER BY tr.created_at DESC
+       LIMIT ?`,
+		)
+		.bind(tagId, ownerUserId, limit)
+		.all();
+	return (results ?? []) as unknown as TagItemPreview[];
 }

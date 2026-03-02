@@ -7,11 +7,29 @@ import {
 	Scripts,
 	ScrollRestoration,
 	useRouteLoaderData,
+	Link as RouterLink,
 } from "react-router";
+
+import {
+	AppBar,
+	Box,
+	Button,
+	CssBaseline,
+	ThemeProvider,
+	Toolbar,
+	Typography,
+	createTheme,
+} from "@mui/material";
 
 import type { Route } from "./+types/root";
 import { getSessionUser } from "./lib/auth.server";
 import "./app.css";
+
+const theme = createTheme({
+	palette: {
+		mode: "dark",
+	},
+});
 
 export async function loader({ request, context }: Route.LoaderArgs) {
 	const url = new URL(request.url);
@@ -60,53 +78,80 @@ export default function App() {
 	const user = data?.user;
 
 	return (
-		<>
+		<ThemeProvider theme={theme}>
+			<CssBaseline />
 			{user && (
-				<nav className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-					<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-						<div className="flex justify-between h-14 items-center">
-							<div className="flex items-center gap-6">
-								<a href="/" className="font-semibold text-gray-900 dark:text-white">
-									Moments Admin
-								</a>
-								<a
-									href="/albums"
-									className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-								>
-									Albums
-								</a>
-								<a
-									href="/gallery"
-									className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-								>
-									Gallery
-								</a>
-								<a
-									href="/tags"
-									className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-								>
-									Tags
-								</a>
-							</div>
-							<div className="flex items-center gap-4">
-								<span className="text-sm text-gray-600 dark:text-gray-400">
-									{user.firstName ?? user}
-								</span>
-								<a
-									href="/logout"
-									className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-								>
-									Log out
-								</a>
-							</div>
-						</div>
-					</div>
-				</nav>
+				<AppBar
+					position="static"
+					color="transparent"
+					elevation={0}
+					sx={{
+						borderBottom: 1,
+						borderColor: "divider",
+						bgcolor: "background.default",
+					}}
+				>
+					<Toolbar
+						sx={{
+							maxWidth: "72rem",
+							width: "100%",
+							mx: "auto",
+							px: { xs: 2, sm: 3, lg: 4 },
+						}}
+					>
+						<Box sx={{ display: "flex", alignItems: "center", gap: 3, flexGrow: 1 }}>
+							<Button
+								component={RouterLink}
+								to="/"
+								color="inherit"
+								sx={{ fontWeight: 600, fontSize: "1rem" }}
+							>
+								Moments Admin
+							</Button>
+							<Button component={RouterLink} to="/albums" color="inherit" size="small">
+								Albums
+							</Button>
+							<Button component={RouterLink} to="/gallery" color="inherit" size="small">
+								Gallery
+							</Button>
+							<Button component={RouterLink} to="/tags" color="inherit" size="small">
+								Tags
+							</Button>
+						</Box>
+						<Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+							<Typography variant="body2" color="text.secondary">
+								{user.firstName ?? user}
+							</Typography>
+							<Button
+								component="a"
+								href="/logout"
+								color="inherit"
+								size="small"
+								variant="outlined"
+							>
+								Log out
+							</Button>
+						</Box>
+					</Toolbar>
+				</AppBar>
 			)}
-			<main className={user ? "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" : ""}>
-				<Outlet />
+			<main>
+				<Box
+					sx={
+						user
+							? {
+									maxWidth: "72rem",
+									mx: "auto",
+									px: { xs: 2, sm: 3, lg: 4 },
+									py: 4,
+							  }
+							: undefined
+					}
+				>
+					<Outlet />
+				</Box>
 			</main>
-		</>
+		</ThemeProvider>
 	);
 }
 

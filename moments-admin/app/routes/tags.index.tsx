@@ -1,7 +1,8 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/tags.index";
 import { getSessionUser } from "../lib/auth.server";
-import { listTags } from "../lib/tags.server";
+import { listItemsForTag, listTags } from "../lib/tags.server";
+import { Box, Button, Card, CardContent, Stack, Typography, Chip } from "@mui/material";
 
 export function meta() {
 	return [{ title: "Tags — Moments Admin" }];
@@ -10,61 +11,113 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
 	const secret = (context.cloudflare.env as { SESSION_SECRET?: string }).SESSION_SECRET;
 	const user = await getSessionUser(request, context.cloudflare.env.DB, secret);
-	if (!user) return { tags: [] };
-	const tags = await listTags(context.cloudflare.env.DB);
-	return { tags };
+	if (!user) return { tags: [], previewsByTag: {} as Record<string, { id: string; imageId: string }[]> };
+
+	const db = context.cloudflare.env.DB;
+	const tags = await listTags(db);
+	const previewsByTag: Record<string, { id: string; imageId: string }[]> = {};
+	for (const tag of tags) {
+		const items = await listItemsForTag(db, user.id, tag.id, 6);
+		previewsByTag[tag.id] = items.map((i) => ({ id: i.id, imageId: i.imageId }));
+	}
+
+	return { tags, previewsByTag };
 }
 
 export default function TagsIndex({ loaderData }: Route.ComponentProps) {
-	const { tags } = loaderData;
+	const { tags, previewsByTag } = loaderData;
 
 	return (
-		<div>
-			<div className="flex justify-between items-center mb-6">
-				<h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+		<Box>
+			<Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
+				<Typography variant="h4" component="h1">
 					Tags
-				</h1>
-			</div>
-			<p className="text-gray-600 dark:text-gray-400 mb-6">
-				Tags appear as gallery filters and hero CTAs. Edit a tag to set its hero
-				title, subtitle, and image.
-			</p>
+				</Typography>
+			</Stack>
+			<Typography variant="body2" color="text.secondary" mb={3}>
+				Tags appear as gallery filters and hero CTAs. Edit a tag to set its hero title, subtitle,
+				and image.
+			</Typography>
 			{tags.length === 0 ? (
-				<div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-					<p className="text-gray-600 dark:text-gray-400">
-						No tags yet. Tags are created when you add them to albums or photos.
-					</p>
-				</div>
+				<Card>
+					<CardContent sx={{ textAlign: "center", py: 6 }}>
+						<Typography color="text.secondary">
+							No tags yet. Tags are created when you add them to albums or photos.
+						</Typography>
+					</CardContent>
+				</Card>
 			) : (
-				<ul className="space-y-3">
+				<Stack spacing={2}>
 					{tags.map((tag) => (
-						<li
-							key={tag.id}
-							className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-						>
-							<div>
-								<span className="font-medium text-gray-900 dark:text-white">
-									{tag.name}
-								</span>
-								<span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-									/{tag.slug}
-								</span>
-								{(tag.heroTitle || tag.heroSubtitle) && (
-									<p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-										Hero: {tag.heroTitle || tag.heroSubtitle || "—"}
-									</p>
+						<Card key={tag.id} variant="outlined">
+							<CardContent>
+								<Stack
+									direction="row"
+									justifyContent="space-between"
+									alignItems="flex-start"
+									spacing={2}
+								>
+									<Box>
+										<Stack direction="row" spacing={1} alignItems="center">
+											<Typography variant="subtitle1">{tag.name}</Typography>
+											<Typography variant="body2" color="text.secondary">
+												/{tag.slug}
+											</Typography>
+										</Stack>
+										<Stack direction="row" spacing={1} mt={0.5} flexWrap="wrap">
+											{tag.kind && (
+												<Chip size="small" label={tag.kind} variant="outlined" />
+											)}
+											{tag.heroTitle && (
+												<Chip
+													size="small"
+													color="primary"
+													variant="outlined"
+													label="Has hero"
+												/>
+											)}
+										</Stack>
+										{(tag.heroTitle || tag.heroSubtitle) && (
+											<Typography variant="body2" color="text.secondary" mt={0.5}>
+												Hero: {tag.heroTitle || tag.heroSubtitle || "—"}
+											</Typography>
+										)}
+									</Box>
+									<Button
+										component={Link}
+										to={`/tags/${tag.id}/edit`}
+										size="small"
+										variant="text"
+									>
+										Edit
+									</Button>
+								</Stack>
+								{(previewsByTag?.[tag.id]?.length ?? 0) > 0 && (
+									<Stack direction="row" spacing={1} mt={2} sx={{ overflowX: "auto" }}>
+										{previewsByTag[tag.id].map((item) => (
+											<Box
+												key={item.id}
+												component="img"
+												src={`/api/items/${item.id}/image`}
+												alt=""
+												sx={{
+													width: 64,
+													height: 64,
+													borderRadius: 1,
+													objectFit: "cover",
+													border: 1,
+													borderColor: "divider",
+												}}
+												loading="lazy"
+											/>
+										))}
+									</Stack>
 								)}
-							</div>
-							<Link
-								to={`/tags/${tag.id}/edit`}
-								className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
-							>
-								Edit
-							</Link>
-						</li>
+							</CardContent>
+						</Card>
 					))}
-				</ul>
+				</Stack>
 			)}
-		</div>
+		</Box>
 	);
 }
