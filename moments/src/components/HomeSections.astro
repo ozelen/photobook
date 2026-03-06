@@ -4,10 +4,13 @@ interface Props {
 	initialTag?: string;
 	heroImageUrl?: string;
 	heroImageAlt?: string;
+	heroObjectPosition?: { x: number; y: number };
 }
-const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "" } = Astro.props;
+const { initialSection, initialTag = "", heroImageUrl, heroImageAlt = "", heroObjectPosition } = Astro.props;
 const atFirst = !initialSection;
 const atLast = initialSection === 'about';
+const objPosX = (heroObjectPosition?.x ?? 0.5) * 100;
+const objPosY = (heroObjectPosition?.y ?? 0.5) * 100;
 ---
 
 <!-- Hero -->
@@ -24,6 +27,7 @@ const atLast = initialSection === 'about';
 					src={heroImageUrl}
 					alt={heroImageAlt}
 					class="w-full h-full object-cover"
+					style={`object-position: ${objPosX}% ${objPosY}%`}
 				/>
 				<div class="absolute inset-0 bg-stone-900/50" aria-hidden="true" />
 			</>
@@ -534,14 +538,21 @@ const atLast = initialSection === 'about';
 			loadGallery(tag);
 		});
 
+		function heroObjectPositionStyle(pos) {
+			const x = (pos?.x ?? 0.5) * 100;
+			const y = (pos?.y ?? 0.5) * 100;
+			return `object-position: ${x}% ${y}%`;
+		}
+
 		function applyHeroSlide(slide, direction) {
 			if (!slide) return;
-			const { heroTitle, heroSubtitle, heroImageUrl, heroImageAlt } = slide;
+			const { heroTitle, heroSubtitle, heroImageUrl, heroImageAlt, heroObjectPosition } = slide;
 			const wrap = document.getElementById('hero-image-wrap');
 			const heroContent = document.getElementById('hero-content');
 			const heroTitleEl = document.getElementById('hero-title');
 			const heroSubtitleEl = document.getElementById('hero-subtitle');
 			const heroTextWrap = document.getElementById('hero-text-wrap');
+			const objPos = heroObjectPositionStyle(heroObjectPosition);
 
 			if (heroTextWrap) heroTextWrap.style.opacity = '0';
 			setTimeout(() => {
@@ -558,7 +569,7 @@ const atLast = initialSection === 'about';
 			if (wrap) {
 				if (heroImageUrl) {
 					const baseLayer = wrap.querySelector('.hero-image-base');
-					const incomingHtml = `<div class="hero-image-incoming hero-image-crossfade absolute inset-0 z-10"><img src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
+					const incomingHtml = `<div class="hero-image-incoming hero-image-crossfade absolute inset-0 z-10"><img src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover" style="${escapeHtml(objPos)}" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
 
 					if (baseLayer) {
 						wrap.insertAdjacentHTML('beforeend', incomingHtml);
@@ -570,7 +581,7 @@ const atLast = initialSection === 'about';
 							incoming?.classList.remove('absolute', 'z-10');
 						}, { once: true });
 					} else {
-						wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
+						wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(heroImageUrl)}" alt="${escapeHtml(heroImageAlt || '')}" class="w-full h-full object-cover" style="${escapeHtml(objPos)}" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
 					}
 
 					if (heroContent) {
@@ -736,7 +747,7 @@ const atLast = initialSection === 'about';
 			fetch(url)
 				.then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load gallery'))))
 				.then(async (data) => {
-					const { galleryItems = [], topTags = [], heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt } = data;
+					const { galleryItems = [], topTags = [], heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt, heroObjectPosition: apiHeroObjectPosition } = data;
 					const galleryTitleEl = document.getElementById('gallery-title');
 					const gallerySubtitleEl = document.getElementById('gallery-subtitle');
 					if (galleryTitleEl) {
@@ -751,10 +762,10 @@ const atLast = initialSection === 'about';
 					const tagSlides = await Promise.all(
 						topTags.map((t) =>
 							tag === t.slug
-								? Promise.resolve({ slug: t.slug, name: t.name, heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt })
+								? Promise.resolve({ slug: t.slug, name: t.name, heroTitle: apiHeroTitle, heroSubtitle: apiHeroSubtitle, heroImageUrl: apiHeroUrl, heroImageAlt: apiHeroAlt, heroObjectPosition: apiHeroObjectPosition })
 								: fetch(`/api/gallery.json?tag=${encodeURIComponent(t.slug)}`)
 										.then((r) => (r.ok ? r.json() : null))
-										.then((d) => d ? { slug: t.slug, name: t.name, heroTitle: d.heroTitle, heroSubtitle: d.heroSubtitle, heroImageUrl: d.heroImageUrl, heroImageAlt: d.heroImageAlt } : null)
+										.then((d) => d ? { slug: t.slug, name: t.name, heroTitle: d.heroTitle, heroSubtitle: d.heroSubtitle, heroImageUrl: d.heroImageUrl, heroImageAlt: d.heroImageAlt, heroObjectPosition: d.heroObjectPosition } : null)
 						)
 					);
 					heroSlides = tagSlides.filter(Boolean);
@@ -764,6 +775,7 @@ const atLast = initialSection === 'about';
 					const displaySubtitle = displayHero?.heroSubtitle ?? apiHeroSubtitle;
 					const displayUrl = displayHero?.heroImageUrl ?? apiHeroUrl;
 					const displayAlt = displayHero?.heroImageAlt ?? apiHeroAlt;
+					const displayObjPos = displayHero?.heroObjectPosition ?? apiHeroObjectPosition;
 					if (heroSlides.length > 0 && !tag) {
 						currentHeroTag = heroSlides[0].slug ?? '';
 					}
@@ -783,7 +795,8 @@ const atLast = initialSection === 'about';
 						}
 						if (wrap) {
 							if (displayUrl) {
-								wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(displayUrl)}" alt="${escapeHtml(displayAlt || '')}" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
+								const objPos = heroObjectPositionStyle(displayObjPos);
+								wrap.innerHTML = `<div class="hero-image-base absolute inset-0"><img id="hero-image" src="${escapeHtml(displayUrl)}" alt="${escapeHtml(displayAlt || '')}" class="w-full h-full object-cover" style="${escapeHtml(objPos)}" /><div class="absolute inset-0 bg-stone-900/50" aria-hidden="true"></div></div>`;
 								if (heroContent) {
 									heroContent.classList.add('text-white');
 									heroContent.querySelector('h1')?.classList.replace('text-stone-900', 'text-white');

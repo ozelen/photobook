@@ -165,13 +165,43 @@ export async function getTagBySlug(
 		: null;
 }
 
+/** Parse hero focal point (0–1) from item meta for object-position. */
+function getHeroFocalFromMeta(meta: string | null): { x: number; y: number } | undefined {
+	if (!meta) return undefined;
+	try {
+		const parsed = JSON.parse(meta) as {
+			crop?: Record<string, { x?: number; y?: number }>;
+		};
+		const hero = parsed?.crop?.hero;
+		if (
+			hero &&
+			typeof hero.x === "number" &&
+			typeof hero.y === "number" &&
+			hero.x >= 0 &&
+			hero.x <= 1 &&
+			hero.y >= 0 &&
+			hero.y <= 1
+		) {
+			return { x: hero.x, y: hero.y };
+		}
+	} catch {
+		// ignore
+	}
+	return undefined;
+}
+
 /** Most recently tagged item (by tag_refs.created_at) for a tag, or any tag if tagSlug empty.
  * When tagSlug is set and the tag has hero_item_id, uses that item instead. */
 export async function getLatestTaggedItem(
 	db: D1Database,
 	adminBaseUrl: string,
 	tagSlug?: string,
-): Promise<{ itemId: string; thumbUrl: string; alt: string } | null> {
+): Promise<{
+	itemId: string;
+	thumbUrl: string;
+	alt: string;
+	heroObjectPosition?: { x: number; y: number };
+} | null> {
 	const base = adminBaseUrl.replace(/\/$/, "");
 
 	let itemId: string | null = null;
@@ -232,11 +262,19 @@ export async function getLatestTaggedItem(
 		.first();
 	if (!inPublicAlbum) return null;
 
+	const metaRow = await db
+		.prepare("SELECT meta FROM items WHERE id = ?")
+		.bind(itemId)
+		.first();
+	const meta = (metaRow as { meta: string | null } | undefined)?.meta ?? null;
+	const heroObjectPosition = getHeroFocalFromMeta(meta);
+
 	const albumName = (inPublicAlbum as { name: string }).name ?? "Photo";
 	return {
 		itemId,
 		thumbUrl: getItemImageUrl(base, itemId, "hero"),
 		alt: albumName,
+		heroObjectPosition: heroObjectPosition ?? undefined,
 	};
 }
 

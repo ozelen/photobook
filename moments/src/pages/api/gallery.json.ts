@@ -74,6 +74,7 @@ export const GET: APIRoute = async (context) => {
 			heroSubtitle,
 			heroImageUrl: heroImage?.thumbUrl ?? null,
 			heroImageAlt: heroImage?.alt ?? null,
+			heroObjectPosition: heroImage?.heroObjectPosition ?? null,
 		}),
 		{
 			status: 200,

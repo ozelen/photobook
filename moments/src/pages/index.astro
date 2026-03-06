@@ -11,5 +11,5 @@ const heroImage = await getLatestTaggedItem(db, adminBaseUrl);
 ---
 
 <PortfolioLayout title={SITE_TITLE} description={SITE_DESCRIPTION} horizontalScroll={true} currentPath="/">
-	<HomeSections heroImageUrl={heroImage?.thumbUrl} heroImageAlt={heroImage?.alt} />
+	<HomeSections heroImageUrl={heroImage?.thumbUrl} heroImageAlt={heroImage?.alt} heroObjectPosition={heroImage?.heroObjectPosition} />
 </PortfolioLayout>
